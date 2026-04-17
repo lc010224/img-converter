@@ -34,8 +34,8 @@
 
 前端页面中可以设置：
 
-- 源图片目录，例如 `/host/var/www/images/source`
-- 输出目录，例如 `/host/var/www/images/output`
+- 源图片目录，例如 `/data/source`
+- 输出目录，例如 `/data/output`
 - 目标格式：`webp` / `jpeg` / `png`
 - 图片质量：1-100
 - 需要处理的输入格式：`jpg` / `jpeg` / `png` / `webp`
@@ -43,14 +43,19 @@
 
 后端会递归扫描源目录中的文件，并将转换后的结果输出到目标目录，保留相对目录结构。
 
-## 为什么路径前面要加 `/host`
+## 更安全的目录挂载方式
 
-在 `docker-compose.yml` 中，宿主机的根目录 `/` 被挂载进后端容器的 `/host`：
+现在 `docker-compose.yml` 不再挂载宿主机根目录 `/`，而是只挂载两个明确的数据目录：
 
-- 宿主机 `/var/www/images/source`
-- 容器内对应路径 `/host/var/www/images/source`
+- 宿主机输入目录 -> 容器内 `/data/source`
+- 宿主机输出目录 -> 容器内 `/data/output`
 
-因此在前端里填写路径时，应该填写容器可见路径，也就是带 `/host` 前缀的路径。
+默认映射为：
+
+- `${HOST_SOURCE_DIR:-/opt/image-converter-data/source}` -> `/data/source`
+- `${HOST_OUTPUT_DIR:-/opt/image-converter-data/output}` -> `/data/output`
+
+这比直接挂载整个服务器根目录更安全，也更适合生产环境。
 
 ## OVH Debian 12 安装方式
 
@@ -81,19 +86,48 @@ sudo systemctl start docker
 scp -r 图片格式转换 user@your-server-ip:/opt/image-converter
 ```
 
-### 2. 进入项目目录
+### 2. 准备宿主机目录
+
+在服务器上创建输入和输出目录：
+
+```bash
+sudo mkdir -p /opt/image-converter-data/source
+sudo mkdir -p /opt/image-converter-data/output
+```
+
+把要转换的图片放到：
+
+```text
+/opt/image-converter-data/source
+```
+
+转换结果会输出到：
+
+```text
+/opt/image-converter-data/output
+```
+
+### 3. 进入项目目录
 
 ```bash
 cd /opt/image-converter
 ```
 
-### 3. 启动服务
+### 4. 启动服务
+
+如果使用默认目录，直接运行：
 
 ```bash
 sudo docker compose up -d --build
 ```
 
-### 4. 打开前端页面
+如果你要自定义宿主机目录，可以这样运行：
+
+```bash
+HOST_SOURCE_DIR=/your/source/path HOST_OUTPUT_DIR=/your/output/path sudo -E docker compose up -d --build
+```
+
+### 5. 打开前端页面
 
 浏览器访问：
 
@@ -110,12 +144,19 @@ http://你的服务器IP:8000
 ## 使用说明
 
 1. 打开前端页面
-2. 填写源目录，例如：`/host/var/www/images/source`
-3. 填写输出目录，例如：`/host/var/www/images/output`
+2. 源目录填写：`/data/source`
+3. 输出目录填写：`/data/output`
 4. 选择目标格式、质量、输入格式
 5. 按需勾选“转换成功后删除原图”
 6. 点击“开始转换”
 7. 页面会显示转换结果 JSON，包括成功数、失败数和具体文件
+
+如果你使用了自定义挂载路径，也仍然填写容器内路径：
+
+- 输入：`/data/source`
+- 输出：`/data/output`
+
+因为前端填写的是容器内路径，不是宿主机绝对路径。
 
 ## 运行检查
 
@@ -146,23 +187,16 @@ curl http://127.0.0.1:8000/health
 
 ## 注意事项
 
-- 当前配置把宿主机根目录挂载到了容器 `/host`，使用方便，但权限较高。
-- 如果你想更安全，可以把 `docker-compose.yml` 中的卷改成特定目录挂载。
+- 当前版本只挂载输入和输出目录，避免暴露整台服务器文件系统。
+- 如果要处理别的目录，请通过 `HOST_SOURCE_DIR` 和 `HOST_OUTPUT_DIR` 指定，而不是重新挂载根目录。
 - 如果图片很多，首次转换可能需要一些时间。
 - 转成 `webp` 时使用的是 `cwebp`。
 - 转成 `jpeg` / `png` 时使用的是 Pillow。
 
 ## GitHub 上传
 
-如果你要上传到 GitHub，可以执行：
+当前项目已经上传到：
 
-```bash
-git init
-git add .
-git commit -m "feat: add dockerized image converter app"
-git branch -M main
-git remote add origin 你的GitHub仓库地址
-git push -u origin main
+```text
+https://github.com/lc010224/img-converter.git
 ```
-
-如果你把仓库地址和可用认证方式给我，我可以继续帮你把上传步骤准备到位。
