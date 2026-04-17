@@ -9,6 +9,12 @@ const folderModal = document.getElementById('folderModal');
 const modalTree = document.getElementById('modalTree');
 const modalCurrentPath = document.getElementById('modalCurrentPath');
 const modalConfirmBtn = document.getElementById('modalConfirmBtn');
+const localUploadTrigger = document.getElementById('localUploadTrigger');
+const localFileInput = document.getElementById('localFileInput');
+const localFolderInput = document.getElementById('localFolderInput');
+const pickFilesBtn = document.getElementById('pickFilesBtn');
+const pickFolderBtn = document.getElementById('pickFolderBtn');
+const localSelectionResult = document.getElementById('localSelectionResult');
 
 const pathTargets = {
   source: document.getElementById('sourcePathDisplay'),
@@ -20,7 +26,6 @@ const pathTargets = {
 const appState = {
   activePicker: null,
   selectedModalPath: '/data',
-  currentModalPath: '/data',
   expanded: new Set(['/data']),
   treeData: {},
 };
@@ -40,13 +45,11 @@ function setActiveTab(tab) {
 async function checkHealth() {
   try {
     const response = await fetch(`${apiBase}/health`);
-    if (!response.ok) {
-      throw new Error('health check failed');
-    }
+    if (!response.ok) throw new Error('health check failed');
     const data = await response.json();
     statusBanner.textContent = `服务在线 · 数据根目录 ${data.data_root} · cwebp ${data.cwebp ? '已安装' : '缺失'} · inotifywait ${data.inotifywait ? '已安装' : '缺失'}`;
     statusBanner.className = 'status-banner ok';
-  } catch (error) {
+  } catch {
     statusBanner.textContent = '服务不可达，请检查容器是否正常运行';
     statusBanner.className = 'status-banner error';
   }
@@ -57,16 +60,12 @@ function collectFormats() {
 }
 
 function pathDepth(path) {
-  if (path === '/data') {
-    return 0;
-  }
+  if (path === '/data') return 0;
   return path.replace('/data/', '').split('/').length;
 }
 
 function pathName(path) {
-  if (path === '/data') {
-    return 'data';
-  }
+  if (path === '/data') return 'data';
   const parts = path.split('/');
   return parts[parts.length - 1] || 'data';
 }
@@ -74,17 +73,12 @@ function pathName(path) {
 async function fetchFolders(path) {
   const response = await fetch(`${apiBase}/folders?path=${encodeURIComponent(path)}`);
   const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.detail || '读取目录失败');
-  }
+  if (!response.ok) throw new Error(data.detail || '读取目录失败');
   return data;
 }
 
 async function ensureNodeLoaded(path) {
-  if (appState.treeData[path]) {
-    return appState.treeData[path];
-  }
-
+  if (appState.treeData[path]) return appState.treeData[path];
   const data = await fetchFolders(path);
   appState.treeData[path] = data;
   return data;
@@ -92,15 +86,10 @@ async function ensureNodeLoaded(path) {
 
 function flattenVisibleNodes(path = '/data', bucket = []) {
   const data = appState.treeData[path];
-  if (!data) {
-    return bucket;
-  }
-
+  if (!data) return bucket;
   (data.directories || []).forEach((directory) => {
     bucket.push(directory.path);
-    if (appState.expanded.has(directory.path)) {
-      flattenVisibleNodes(directory.path, bucket);
-    }
+    if (appState.expanded.has(directory.path)) flattenVisibleNodes(directory.path, bucket);
   });
   return bucket;
 }
@@ -108,7 +97,6 @@ function flattenVisibleNodes(path = '/data', bucket = []) {
 function renderModalTree() {
   modalCurrentPath.textContent = appState.selectedModalPath;
   const visibleNodes = flattenVisibleNodes();
-
   if (!visibleNodes.length) {
     modalTree.innerHTML = '<div class="modal-empty">当前目录下没有可选子文件夹</div>';
     return;
@@ -118,17 +106,11 @@ function renderModalTree() {
     const depth = pathDepth(path);
     const expanded = appState.expanded.has(path);
     const selected = appState.selectedModalPath === path;
-
     return `
       <div class="modal-tree-row ${selected ? 'modal-tree-row--selected' : ''}" style="--depth:${depth}">
-        <button type="button" class="modal-folder-btn ${expanded ? 'is-open' : ''}" data-modal-mode="toggle" data-path="${path}" aria-label="展开目录">
-          <span>📁</span>
-        </button>
-        <button type="button" class="modal-path-btn ${selected ? 'is-selected' : ''}" data-modal-mode="select" data-path="${path}">
-          <span class="modal-path-name">${pathName(path)}</span>
-        </button>
-      </div>
-    `;
+        <button type="button" class="modal-folder-btn ${expanded ? 'is-open' : ''}" data-modal-mode="toggle" data-path="${path}" aria-label="展开目录"><span>📁</span></button>
+        <button type="button" class="modal-path-btn ${selected ? 'is-selected' : ''}" data-modal-mode="select" data-path="${path}"><span class="modal-path-name">${pathName(path)}</span></button>
+      </div>`;
   }).join('');
 }
 
@@ -141,7 +123,6 @@ async function initializeModalTree() {
 async function openFolderModal(pickerKey) {
   appState.activePicker = pickerKey;
   appState.selectedModalPath = pathTargets[pickerKey].value || '/data';
-  appState.currentModalPath = '/data';
   appState.expanded = new Set(['/data']);
   appState.treeData = {};
   folderModal.classList.add('is-open');
@@ -161,7 +142,6 @@ async function toggleNode(path) {
     renderModalTree();
     return;
   }
-
   await ensureNodeLoaded(path);
   appState.expanded.add(path);
   renderModalTree();
@@ -173,22 +153,43 @@ function selectNode(path) {
 }
 
 function commitSelectedPath() {
-  if (!appState.activePicker) {
-    return;
-  }
+  if (!appState.activePicker) return;
   pathTargets[appState.activePicker].value = appState.selectedModalPath;
   closeFolderModal();
 }
 
-navItems.forEach((item) => {
-  item.addEventListener('click', () => setActiveTab(item.dataset.tab));
+function renderLocalSelection(files) {
+  if (!files.length) {
+    localSelectionResult.textContent = '暂未选择本地文件或文件夹';
+    return;
+  }
+  const lines = files.slice(0, 50).map((file) => `${file.webkitRelativePath || file.name} (${Math.round(file.size / 1024)} KB)`);
+  const extra = files.length > 50 ? `\n... 其余 ${files.length - 50} 个文件未展开` : '';
+  localSelectionResult.textContent = `共选择 ${files.length} 个项目\n\n${lines.join('\n')}${extra}`;
+}
+
+navItems.forEach((item) => item.addEventListener('click', () => setActiveTab(item.dataset.tab)));
+
+localUploadTrigger.addEventListener('click', () => localFileInput.click());
+pickFilesBtn.addEventListener('click', () => localFileInput.click());
+pickFolderBtn.addEventListener('click', () => localFolderInput.click());
+localFileInput.addEventListener('change', () => renderLocalSelection(Array.from(localFileInput.files || [])));
+localFolderInput.addEventListener('change', () => renderLocalSelection(Array.from(localFolderInput.files || [])));
+
+localUploadTrigger.addEventListener('dragover', (event) => {
+  event.preventDefault();
+  localUploadTrigger.classList.add('is-dragging');
+});
+localUploadTrigger.addEventListener('dragleave', () => localUploadTrigger.classList.remove('is-dragging'));
+localUploadTrigger.addEventListener('drop', (event) => {
+  event.preventDefault();
+  localUploadTrigger.classList.remove('is-dragging');
+  renderLocalSelection(Array.from(event.dataTransfer?.files || []));
 });
 
 document.addEventListener('click', async (event) => {
   const target = event.target;
-  if (!(target instanceof HTMLElement)) {
-    return;
-  }
+  if (!(target instanceof HTMLElement)) return;
 
   const openPicker = target.closest('[data-open-picker]');
   if (openPicker instanceof HTMLElement) {
@@ -210,19 +211,9 @@ document.addEventListener('click', async (event) => {
   if (modalAction instanceof HTMLElement) {
     const mode = modalAction.dataset.modalMode;
     const path = modalAction.dataset.path;
-    if (!path) {
-      return;
-    }
-
-    if (mode === 'toggle') {
-      await toggleNode(path);
-      return;
-    }
-
-    if (mode === 'select') {
-      selectNode(path);
-      return;
-    }
+    if (!path) return;
+    if (mode === 'toggle') return toggleNode(path);
+    if (mode === 'select') return selectNode(path);
   }
 });
 
@@ -230,7 +221,6 @@ modalConfirmBtn.addEventListener('click', commitSelectedPath);
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
-
   const inputFormats = collectFormats();
   if (!inputFormats.length) {
     resultBox.textContent = '请至少选择一种需要处理的原始格式。';
@@ -251,17 +241,11 @@ form.addEventListener('submit', async (event) => {
   try {
     const response = await fetch(`${apiBase}/convert`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-
     const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.detail || '转换失败');
-    }
-
+    if (!response.ok) throw new Error(data.detail || '转换失败');
     resultBox.textContent = JSON.stringify(data, null, 2);
   } catch (error) {
     resultBox.textContent = `执行失败：${error.message}`;
