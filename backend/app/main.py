@@ -13,7 +13,24 @@ from PIL import Image
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 DATA_ROOT = Path("/data")
-SUPPORTED_INPUTS = {"jpg", "jpeg", "png", "webp"}
+SUPPORTED_INPUTS = {
+    "jpg",
+    "jpeg",
+    "jpe",
+    "jfif",
+    "png",
+    "webp",
+    "gif",
+    "bmp",
+    "dib",
+    "ico",
+    "tif",
+    "tiff",
+    "pbm",
+    "pgm",
+    "pnm",
+    "ppm",
+}
 SUPPORTED_OUTPUTS = {"webp", "jpeg", "png"}
 
 app = FastAPI(title="Image Converter API")
