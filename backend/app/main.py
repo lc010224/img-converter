@@ -1,14 +1,19 @@
+from io import BytesIO
 from pathlib import Path
 import shutil
 import subprocess
 from typing import Literal
 
+import cairosvg
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from PIL import Image
+from pillow_heif import register_heif_opener
+
+register_heif_opener()
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -30,8 +35,13 @@ SUPPORTED_INPUTS = {
     "pgm",
     "pnm",
     "ppm",
+    "heic",
+    "heif",
+    "avif",
+    "svg",
 }
 SUPPORTED_OUTPUTS = {"webp", "jpeg", "png"}
+HEIF_FAMILY = {"heic", "heif", "avif"}
 
 app = FastAPI(title="Image Converter API")
 app.add_middleware(
@@ -82,6 +92,18 @@ def to_display_path(path: Path) -> str:
     if resolved == root:
         return "/data"
     return f"/data/{resolved.relative_to(root).as_posix()}"
+
+
+def open_image(file_path: Path) -> Image.Image:
+    ext = file_path.suffix.lower().lstrip('.')
+    if ext == "svg":
+        png_bytes = cairosvg.svg2png(url=str(file_path))
+        return Image.open(BytesIO(png_bytes))
+
+    if ext in HEIF_FAMILY:
+        return Image.open(file_path)
+
+    return Image.open(file_path)
 
 
 @app.get("/")
@@ -156,7 +178,7 @@ def convert_images(request: ConvertRequest):
         target_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
-            if request.target_format == 'webp':
+            if request.target_format == 'webp' and ext not in {"svg", *HEIF_FAMILY}:
                 subprocess.run(
                     [
                         'cwebp',
@@ -171,10 +193,20 @@ def convert_images(request: ConvertRequest):
                     text=True,
                 )
             else:
-                with Image.open(file_path) as image:
-                    working_image = image.convert('RGB') if request.target_format == 'jpeg' else image
-                    save_format = 'JPEG' if request.target_format == 'jpeg' else 'PNG'
-                    save_kwargs = {'quality': request.quality} if request.target_format == 'jpeg' else {'optimize': True}
+                with open_image(file_path) as image:
+                    if request.target_format == 'jpeg':
+                        working_image = image.convert('RGB')
+                        save_format = 'JPEG'
+                        save_kwargs = {'quality': request.quality}
+                    elif request.target_format == 'png':
+                        working_image = image
+                        save_format = 'PNG'
+                        save_kwargs = {'optimize': True}
+                    else:
+                        working_image = image.convert('RGBA') if image.mode in {'P', 'LA'} else image
+                        save_format = 'WEBP'
+                        save_kwargs = {'quality': request.quality}
+
                     working_image.save(target_path, save_format, **save_kwargs)
 
             converted.append({
