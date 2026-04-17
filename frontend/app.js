@@ -4,27 +4,25 @@ const resultBox = document.getElementById('resultBox');
 const statusBanner = document.getElementById('statusBanner');
 const pageTitle = document.getElementById('pageTitle');
 const navItems = Array.from(document.querySelectorAll('.nav-item'));
-const panels = Array.from(document.querySelectorAll('.tab-panel'));
+const panels = Array.from(document.querySelectorAll('.panel'));
+const folderModal = document.getElementById('folderModal');
+const modalTree = document.getElementById('modalTree');
+const modalCurrentPath = document.getElementById('modalCurrentPath');
+const modalConfirmBtn = document.getElementById('modalConfirmBtn');
 
-const pickerState = {
-  source: {
-    selectedPath: '/data',
-    currentPath: '/data',
-    expanded: new Set(['/data']),
-    treeData: {},
-    selectedEl: document.getElementById('sourceSelected'),
-    currentEl: document.getElementById('sourceCurrent'),
-    treeEl: document.getElementById('sourceTree'),
-  },
-  output: {
-    selectedPath: '/data',
-    currentPath: '/data',
-    expanded: new Set(['/data']),
-    treeData: {},
-    selectedEl: document.getElementById('outputSelected'),
-    currentEl: document.getElementById('outputCurrent'),
-    treeEl: document.getElementById('outputTree'),
-  },
+const pathTargets = {
+  source: document.getElementById('sourcePathDisplay'),
+  output: document.getElementById('outputPathDisplay'),
+  watchSource: document.getElementById('watchSourceDisplay'),
+  watchOutput: document.getElementById('watchOutputDisplay'),
+};
+
+const appState = {
+  activePicker: null,
+  selectedModalPath: '/data',
+  currentModalPath: '/data',
+  expanded: new Set(['/data']),
+  treeData: {},
 };
 
 function setActiveTab(tab) {
@@ -58,28 +56,19 @@ function collectFormats() {
   return Array.from(document.querySelectorAll('input[name="inputFormats"]:checked')).map((item) => item.value);
 }
 
-function nodeDepth(path) {
+function pathDepth(path) {
   if (path === '/data') {
     return 0;
   }
   return path.replace('/data/', '').split('/').length;
 }
 
-function getNodeName(path) {
+function pathName(path) {
   if (path === '/data') {
     return 'data';
   }
   const parts = path.split('/');
   return parts[parts.length - 1] || 'data';
-}
-
-function isDirectChild(parentPath, childPath) {
-  if (parentPath === childPath) {
-    return false;
-  }
-  const parentDepth = nodeDepth(parentPath);
-  const childDepth = nodeDepth(childPath);
-  return childPath.startsWith(`${parentPath}/`) && childDepth === parentDepth + 1;
 }
 
 async function fetchFolders(path) {
@@ -91,103 +80,106 @@ async function fetchFolders(path) {
   return data;
 }
 
-async function ensureNodeLoaded(type, path) {
-  const state = pickerState[type];
-  if (state.treeData[path]) {
-    return state.treeData[path];
+async function ensureNodeLoaded(path) {
+  if (appState.treeData[path]) {
+    return appState.treeData[path];
   }
 
   const data = await fetchFolders(path);
-  state.treeData[path] = data;
-  state.currentPath = data.current_path;
+  appState.treeData[path] = data;
   return data;
 }
 
-function flattenVisibleNodes(type, path = '/data', bucket = []) {
-  const state = pickerState[type];
-  const data = state.treeData[path];
+function flattenVisibleNodes(path = '/data', bucket = []) {
+  const data = appState.treeData[path];
   if (!data) {
     return bucket;
   }
 
-  const directories = data.directories || [];
-  directories.forEach((directory) => {
+  (data.directories || []).forEach((directory) => {
     bucket.push(directory.path);
-    if (state.expanded.has(directory.path)) {
-      flattenVisibleNodes(type, directory.path, bucket);
+    if (appState.expanded.has(directory.path)) {
+      flattenVisibleNodes(directory.path, bucket);
     }
   });
   return bucket;
 }
 
-function renderTree(type) {
-  const state = pickerState[type];
-  state.selectedEl.textContent = state.selectedPath;
-  state.currentEl.textContent = state.currentPath;
+function renderModalTree() {
+  modalCurrentPath.textContent = appState.selectedModalPath;
+  const visibleNodes = flattenVisibleNodes();
 
-  const visibleNodes = flattenVisibleNodes(type);
   if (!visibleNodes.length) {
-    state.treeEl.innerHTML = '<div class="tree-empty">当前目录下没有可浏览的子文件夹</div>';
+    modalTree.innerHTML = '<div class="modal-empty">当前目录下没有可选子文件夹</div>';
     return;
   }
 
-  state.treeEl.innerHTML = visibleNodes.map((path) => {
-    const depth = nodeDepth(path);
-    const expanded = state.expanded.has(path);
-    const loaded = Boolean(state.treeData[path]);
-    const selected = state.selectedPath === path;
-    const label = getNodeName(path);
+  modalTree.innerHTML = visibleNodes.map((path) => {
+    const depth = pathDepth(path);
+    const expanded = appState.expanded.has(path);
+    const selected = appState.selectedModalPath === path;
+    const loaded = Boolean(appState.treeData[path]);
 
     return `
-      <div class="tree-row ${selected ? 'tree-row--selected' : ''}" style="--depth:${depth}">
-        <button type="button" class="tree-expand ${expanded ? 'is-open' : ''}" data-picker-type="${type}" data-mode="toggle" data-path="${path}" aria-label="展开目录">
-          <span class="folder-glyph">📁</span>
+      <div class="modal-tree-row ${selected ? 'modal-tree-row--selected' : ''}" style="--depth:${depth}">
+        <button type="button" class="modal-folder-btn ${expanded ? 'is-open' : ''}" data-modal-mode="toggle" data-path="${path}" aria-label="展开目录">
+          <span>📁</span>
         </button>
-        <button type="button" class="tree-select ${selected ? 'is-selected' : ''}" data-picker-type="${type}" data-mode="select" data-path="${path}">
-          <span class="tree-name">${label}</span>
-          <span class="tree-path">${path}</span>
+        <button type="button" class="modal-path-btn ${selected ? 'is-selected' : ''}" data-modal-mode="select" data-path="${path}">
+          <span class="modal-path-name">${pathName(path)}</span>
         </button>
-        <span class="tree-state">${loaded ? (expanded ? '已展开' : '可展开') : '未加载'}</span>
+        <span class="modal-path-state">${loaded ? '可用' : '未加载'}</span>
       </div>
     `;
   }).join('');
 }
 
-async function initializeTree(type) {
-  const state = pickerState[type];
-  state.treeEl.innerHTML = '<div class="tree-empty">正在读取目录...</div>';
-  await ensureNodeLoaded(type, '/data');
-  renderTree(type);
+async function initializeModalTree() {
+  modalTree.innerHTML = '<div class="modal-empty">正在读取目录...</div>';
+  await ensureNodeLoaded('/data');
+  renderModalTree();
 }
 
-async function toggleNode(type, path) {
-  const state = pickerState[type];
-  if (state.expanded.has(path)) {
-    state.expanded.delete(path);
-    state.currentPath = path;
-    renderTree(type);
+async function openFolderModal(pickerKey) {
+  appState.activePicker = pickerKey;
+  appState.selectedModalPath = pathTargets[pickerKey].value || '/data';
+  appState.currentModalPath = '/data';
+  appState.expanded = new Set(['/data']);
+  appState.treeData = {};
+  folderModal.classList.add('is-open');
+  folderModal.setAttribute('aria-hidden', 'false');
+  await initializeModalTree();
+}
+
+function closeFolderModal() {
+  folderModal.classList.remove('is-open');
+  folderModal.setAttribute('aria-hidden', 'true');
+  appState.activePicker = null;
+}
+
+async function toggleNode(path) {
+  if (appState.expanded.has(path)) {
+    appState.expanded.delete(path);
+    renderModalTree();
     return;
   }
 
-  await ensureNodeLoaded(type, path);
-  state.expanded.add(path);
-  state.currentPath = path;
-  renderTree(type);
+  await ensureNodeLoaded(path);
+  appState.expanded.add(path);
+  renderModalTree();
 }
 
-function selectNode(type, path) {
-  const state = pickerState[type];
-  state.selectedPath = path;
-  state.currentPath = path;
-  renderTree(type);
+function selectNode(path) {
+  appState.selectedModalPath = path;
+  renderModalTree();
 }
 
-async function refreshTree(type) {
-  const state = pickerState[type];
-  state.treeData = {};
-  state.expanded = new Set(['/data']);
-  state.currentPath = '/data';
-  await initializeTree(type);
+function commitSelectedPath() {
+  if (!appState.activePicker) {
+    return;
+  }
+  pathTargets[appState.activePicker].value = appState.selectedModalPath;
+  closeFolderModal();
 }
 
 navItems.forEach((item) => {
@@ -200,33 +192,43 @@ document.addEventListener('click', async (event) => {
     return;
   }
 
-  const action = target.dataset.action;
-  if (action === 'refresh-source') {
-    await refreshTree('source');
-    return;
-  }
-  if (action === 'refresh-output') {
-    await refreshTree('output');
+  const openPicker = target.closest('[data-open-picker]');
+  if (openPicker instanceof HTMLElement) {
+    await openFolderModal(openPicker.dataset.openPicker);
     return;
   }
 
-  const pickerType = target.dataset.pickerType;
-  const mode = target.dataset.mode;
-  const path = target.dataset.path;
-
-  if (!pickerType || !mode || !path) {
+  if (target.dataset.closeModal === 'true' || target.dataset.cancelModal === 'true') {
+    closeFolderModal();
     return;
   }
 
-  if (mode === 'toggle') {
-    await toggleNode(pickerType, path);
+  if (target === folderModal) {
+    closeFolderModal();
     return;
   }
 
-  if (mode === 'select') {
-    selectNode(pickerType, path);
+  const modalAction = target.closest('[data-modal-mode]');
+  if (modalAction instanceof HTMLElement) {
+    const mode = modalAction.dataset.modalMode;
+    const path = modalAction.dataset.path;
+    if (!path) {
+      return;
+    }
+
+    if (mode === 'toggle') {
+      await toggleNode(path);
+      return;
+    }
+
+    if (mode === 'select') {
+      selectNode(path);
+      return;
+    }
   }
 });
+
+modalConfirmBtn.addEventListener('click', commitSelectedPath);
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -238,8 +240,8 @@ form.addEventListener('submit', async (event) => {
   }
 
   const payload = {
-    source_path: pickerState.source.selectedPath,
-    output_path: pickerState.output.selectedPath,
+    source_path: pathTargets.source.value.trim(),
+    output_path: pathTargets.output.value.trim(),
     target_format: document.getElementById('targetFormat').value,
     quality: Number(document.getElementById('quality').value),
     input_formats: inputFormats,
@@ -270,5 +272,3 @@ form.addEventListener('submit', async (event) => {
 
 setActiveTab('convert');
 checkHealth();
-initializeTree('source');
-initializeTree('output');

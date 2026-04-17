@@ -7,137 +7,108 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/styles.css?v=20260417b" />
+    <link rel="stylesheet" href="/assets/styles.css?v=20260418a" />
   </head>
   <body>
-    <div class="aurora aurora--one"></div>
-    <div class="aurora aurora--two"></div>
-    <div class="shell">
-      <aside class="sidebar glass-card">
+    <div class="page-shell">
+      <aside class="sidebar">
         <div class="brand-block">
-          <div class="brand-mark">◎</div>
+          <div class="brand-logo">✦</div>
           <div>
-            <p class="brand-eyebrow">Media Pipeline</p>
+            <p class="brand-kicker">Media Pipeline</p>
             <h1>图片转换控制台</h1>
           </div>
         </div>
 
         <nav class="side-nav">
           <button class="nav-item is-active" data-tab="convert">
-            <span class="nav-icon">◫</span>
+            <span class="nav-dot"></span>
             <div>
               <strong>图片转换</strong>
-              <small>手动选目录，一次性批量转换</small>
+              <small>手动选择目录，一次性批量转换</small>
             </div>
           </button>
           <button class="nav-item" data-tab="watch">
-            <span class="nav-icon">◌</span>
+            <span class="nav-dot"></span>
             <div>
               <strong>自动监听</strong>
-              <small>监听目录变化并自动处理</small>
+              <small>监听目录变更并自动处理</small>
             </div>
           </button>
           <button class="nav-item" data-tab="studio">
-            <span class="nav-icon">✦</span>
+            <span class="nav-dot"></span>
             <div>
               <strong>视觉与策略</strong>
-              <small>背景图、命名与输出偏好</small>
+              <small>背景图、命名策略与展示偏好</small>
             </div>
           </button>
         </nav>
 
-        <div class="sidebar-note glass-panel">
-          <p class="panel-kicker">服务状态</p>
+        <div class="status-card">
+          <p class="section-label">服务状态</p>
           <div id="statusBanner" class="status-banner pending">正在检测服务...</div>
-          <p class="muted-copy">单容器部署、单数据根目录、前端后端统一入口。</p>
         </div>
       </aside>
 
-      <main class="content">
-        <header class="topbar glass-card">
+      <main class="main-shell">
+        <header class="topbar">
           <div>
-            <p class="panel-kicker">OVH · Debian 12 · Docker Compose</p>
+            <p class="section-label">OVH · Debian 12 · Docker Compose</p>
             <h2 id="pageTitle">图片转换</h2>
           </div>
-          <div class="topbar-badge">ghcr.io/lc010224/img-converter:latest</div>
+          <div class="image-badge">ghcr.io/lc010224/img-converter:latest</div>
         </header>
 
-        <section class="tab-panel is-active" data-panel="convert">
-          <div class="hero-card glass-card">
+        <section class="panel is-active" data-panel="convert">
+          <div class="hero-panel">
             <div>
-              <p class="panel-kicker">批量任务</p>
-              <h3>创建一次图片批量转换任务</h3>
-              <p class="hero-copy">
-                以更稳的树状目录选择器选择源目录与输出目录，支持按图片格式过滤、质量控制与删除原图。
-              </p>
-            </div>
-            <div class="hero-stats">
-              <div class="stat-pill">
-                <span>根目录</span>
-                <strong>/data</strong>
-              </div>
-              <div class="stat-pill">
-                <span>支持格式</span>
-                <strong>webp / jpeg / png</strong>
-              </div>
+              <p class="section-label">批量任务</p>
+              <h3>创建一次图片格式转换任务</h3>
+              <p class="lead-text">浅色模式、弹窗式目录选择、单数据根目录管理。</p>
             </div>
           </div>
 
-          <form id="conversion-form" class="workspace-grid">
-            <section class="glass-card main-card">
+          <form id="conversion-form" class="content-grid">
+            <section class="card form-card wide">
               <div class="card-head">
                 <div>
-                  <p class="panel-kicker">目录选择</p>
+                  <p class="section-label">目录选择</p>
                   <h3>源目录与输出目录</h3>
-                </div>
-                <div class="chip-row">
-                  <span class="soft-chip">点击文件夹图标展开</span>
-                  <span class="soft-chip">点击名称选中本级</span>
                 </div>
               </div>
 
-              <div class="picker-grid">
-                <article class="tree-card" data-picker="source">
-                  <div class="tree-card__head">
-                    <div>
-                      <p class="tree-title">源图片目录</p>
-                      <p id="sourceSelected" class="tree-selected">/data</p>
-                    </div>
-                    <button type="button" class="tiny-btn" data-action="refresh-source">刷新</button>
+              <div class="field-stack">
+                <label class="path-field-group">
+                  <span>源图片目录</span>
+                  <div class="path-input-wrap">
+                    <input id="sourcePathDisplay" class="path-display-input" value="/data" readonly />
+                    <button type="button" class="folder-trigger" data-open-picker="source" aria-label="选择源目录">
+                      <span class="folder-trigger__icon">📁</span>
+                    </button>
                   </div>
-                  <div class="tree-current-row">
-                    <span class="tree-current-label">当前路径</span>
-                    <strong id="sourceCurrent" class="tree-current-path">/data</strong>
-                  </div>
-                  <div id="sourceTree" class="tree-list"></div>
-                </article>
+                </label>
 
-                <article class="tree-card" data-picker="output">
-                  <div class="tree-card__head">
-                    <div>
-                      <p class="tree-title">输出目录</p>
-                      <p id="outputSelected" class="tree-selected">/data</p>
-                    </div>
-                    <button type="button" class="tiny-btn" data-action="refresh-output">刷新</button>
+                <label class="path-field-group">
+                  <span>输出目录</span>
+                  <div class="path-input-wrap">
+                    <input id="outputPathDisplay" class="path-display-input" value="/data" readonly />
+                    <button type="button" class="folder-trigger" data-open-picker="output" aria-label="选择输出目录">
+                      <span class="folder-trigger__icon">📁</span>
+                    </button>
                   </div>
-                  <div class="tree-current-row">
-                    <span class="tree-current-label">当前路径</span>
-                    <strong id="outputCurrent" class="tree-current-path">/data</strong>
-                  </div>
-                  <div id="outputTree" class="tree-list"></div>
-                </article>
+                </label>
               </div>
             </section>
 
-            <aside class="glass-card side-card">
+            <aside class="card form-card side">
               <div class="card-head compact">
                 <div>
-                  <p class="panel-kicker">转换参数</p>
+                  <p class="section-label">转换参数</p>
                   <h3>输出规则</h3>
                 </div>
               </div>
 
-              <div class="form-stack">
+              <div class="field-stack">
                 <label>
                   <span>目标格式</span>
                   <select id="targetFormat" name="targetFormat">
@@ -172,10 +143,10 @@
             </aside>
           </form>
 
-          <section class="glass-card result-card">
+          <section class="card result-card">
             <div class="card-head compact">
               <div>
-                <p class="panel-kicker">最近结果</p>
+                <p class="section-label">最近结果</p>
                 <h3>执行日志与返回内容</h3>
               </div>
             </div>
@@ -183,88 +154,76 @@
           </section>
         </section>
 
-        <section class="tab-panel" data-panel="watch">
-          <div class="glass-card watch-layout">
-            <div class="card-head">
-              <div>
-                <p class="panel-kicker">自动监听</p>
-                <h3>监听目录变化并自动转换</h3>
+        <section class="panel" data-panel="watch">
+          <div class="content-grid single-column">
+            <section class="card form-card wide">
+              <div class="card-head">
+                <div>
+                  <p class="section-label">自动监听</p>
+                  <h3>监听目录变化并自动转换</h3>
+                </div>
               </div>
-              <span class="soft-chip">UI 已准备，可继续接入后端监听任务</span>
-            </div>
-
-            <div class="watch-grid">
-              <div class="glass-panel form-stack">
-                <label>
+              <div class="field-stack two-column-fields">
+                <label class="path-field-group">
                   <span>监听原目录</span>
-                  <input value="/data/watch/input" />
+                  <div class="path-input-wrap">
+                    <input id="watchSourceDisplay" class="path-display-input" value="/data" readonly />
+                    <button type="button" class="folder-trigger" data-open-picker="watchSource" aria-label="选择监听目录">
+                      <span class="folder-trigger__icon">📁</span>
+                    </button>
+                  </div>
+                </label>
+                <label class="path-field-group">
+                  <span>输出目录</span>
+                  <div class="path-input-wrap">
+                    <input id="watchOutputDisplay" class="path-display-input" value="/data" readonly />
+                    <button type="button" class="folder-trigger" data-open-picker="watchOutput" aria-label="选择监听输出目录">
+                      <span class="folder-trigger__icon">📁</span>
+                    </button>
+                  </div>
                 </label>
                 <label>
-                  <span>输出目录</span>
-                  <input value="/data/watch/output" />
+                  <span>监听时间间隔（秒）</span>
+                  <input type="number" value="15" />
                 </label>
-                <div class="two-cols">
-                  <label>
-                    <span>监听间隔（秒）</span>
-                    <input type="number" value="15" />
-                  </label>
-                  <label>
-                    <span>输出格式</span>
-                    <select>
-                      <option>webp</option>
-                      <option>jpeg</option>
-                      <option>png</option>
-                    </select>
-                  </label>
-                </div>
-                <div class="two-cols">
-                  <label>
-                    <span>质量</span>
-                    <input type="number" value="82" />
-                  </label>
-                  <label>
-                    <span>文件命名策略</span>
-                    <select>
-                      <option>保持原名</option>
-                      <option>添加时间戳</option>
-                      <option>添加后缀</option>
-                    </select>
-                  </label>
-                </div>
-                <div class="checkbox-group stacked">
-                  <label><input type="checkbox" checked /> 自动创建输出目录</label>
-                  <label><input type="checkbox" checked /> 忽略隐藏文件</label>
-                  <label><input type="checkbox" /> 转换后删除原图</label>
-                  <label><input type="checkbox" checked /> 启动容器后自动恢复监听</label>
-                </div>
-                <button type="button" class="primary-btn secondary-tone">保存监听配置</button>
+                <label>
+                  <span>自动转换格式</span>
+                  <select>
+                    <option>webp</option>
+                    <option>jpeg</option>
+                    <option>png</option>
+                  </select>
+                </label>
+                <label>
+                  <span>质量</span>
+                  <input type="number" value="82" />
+                </label>
+                <label>
+                  <span>背景图 URL</span>
+                  <input value="https://images.example.com/bg.jpg" />
+                </label>
               </div>
-
-              <div class="glass-panel preview-panel">
-                <p class="panel-kicker">建议增强项</p>
-                <ul class="feature-list compact-list">
-                  <li>监听日志滚动窗口</li>
-                  <li>失败重试次数配置</li>
-                  <li>最大并发转换数</li>
-                  <li>夜间低频模式</li>
-                  <li>格式白名单/黑名单</li>
-                  <li>按子目录生成独立输出目录</li>
-                </ul>
+              <div class="checkbox-group stacked">
+                <label><input type="checkbox" checked /> 自动创建输出目录</label>
+                <label><input type="checkbox" checked /> 忽略隐藏文件</label>
+                <label><input type="checkbox" /> 转换完成删除原图</label>
+                <label><input type="checkbox" checked /> 启动容器后自动恢复监听</label>
               </div>
-            </div>
+              <button type="button" class="primary-btn secondary-btn">保存监听配置</button>
+            </section>
           </div>
         </section>
 
-        <section class="tab-panel" data-panel="studio">
-          <div class="studio-grid">
-            <section class="glass-card">
-              <div class="card-head compact">
+        <section class="panel" data-panel="studio">
+          <div class="content-grid single-column">
+            <section class="card form-card wide">
+              <div class="card-head">
                 <div>
-                  <p class="panel-kicker">视觉与背景</p>
-                  <h3>界面表现配置</h3>
+                  <p class="section-label">视觉与策略</p>
+                  <h3>显示偏好与默认输出行为</h3>
                 </div>
               </div>
-              <div class="form-stack">
+              <div class="field-stack two-column-fields">
                 <label>
                   <span>背景图 URL</span>
                   <input value="https://images.example.com/cover.jpg" />
@@ -272,46 +231,54 @@
                 <label>
                   <span>主题风格</span>
                   <select>
-                    <option>暗色玻璃</option>
-                    <option>柔光浅色</option>
-                    <option>极夜蓝调</option>
+                    <option>清透浅色</option>
+                    <option>柔光白金</option>
+                    <option>米白工作台</option>
                   </select>
                 </label>
                 <label>
-                  <span>结果展示方式</span>
+                  <span>结果显示方式</span>
                   <select>
-                    <option>原始 JSON</option>
+                    <option>JSON 原样显示</option>
                     <option>摘要优先</option>
                     <option>表格优先</option>
                   </select>
                 </label>
-                <button type="button" class="primary-btn secondary-tone">保存界面配置</button>
+                <label>
+                  <span>默认命名策略</span>
+                  <select>
+                    <option>保留原名</option>
+                    <option>添加后缀</option>
+                    <option>添加时间戳</option>
+                  </select>
+                </label>
               </div>
-            </section>
-
-            <section class="glass-card">
-              <div class="card-head compact">
-                <div>
-                  <p class="panel-kicker">输出策略</p>
-                  <h3>默认行为模板</h3>
-                </div>
-              </div>
-              <div class="checkbox-group stacked spacious">
-                <label><input type="checkbox" checked /> 默认保留目录结构</label>
-                <label><input type="checkbox" checked /> 默认启用质量压缩</label>
-                <label><input type="checkbox" /> 默认覆盖已有输出文件</label>
-                <label><input type="checkbox" checked /> 默认显示完整路径</label>
-              </div>
-              <div class="glass-panel tip-panel">
-                <p class="tip-title">说明</p>
-                <p>这个页面先作为未来配置中心入口，后续可以继续接入真实持久化配置接口。</p>
-              </div>
+              <button type="button" class="primary-btn secondary-btn">保存显示策略</button>
             </section>
           </div>
         </section>
       </main>
     </div>
 
-    <script src="/assets/app.js?v=20260417b"></script>
+    <div id="folderModal" class="modal-backdrop" aria-hidden="true">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="folderModalTitle">
+        <div class="modal-head">
+          <h3 id="folderModalTitle">选择路径</h3>
+          <button type="button" class="modal-close" data-close-modal="true">×</button>
+        </div>
+
+        <div id="modalTree" class="modal-tree"></div>
+
+        <div class="modal-footer">
+          <div class="modal-current">当前路径：<span id="modalCurrentPath">/data</span></div>
+          <div class="modal-actions">
+            <button type="button" class="footer-btn" data-cancel-modal="true">取消</button>
+            <button type="button" class="footer-btn footer-btn--primary" id="modalConfirmBtn">确认</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/assets/app.js?v=20260418a"></script>
   </body>
 </html>
