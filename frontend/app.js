@@ -15,6 +15,7 @@ const localFolderInput = document.getElementById('localFolderInput');
 const pickFilesBtn = document.getElementById('pickFilesBtn');
 const pickFolderBtn = document.getElementById('pickFolderBtn');
 const localSelectionResult = document.getElementById('localSelectionResult');
+const localConvertBtn = document.getElementById('localConvertBtn');
 
 const pathTargets = {
   source: document.getElementById('sourcePathDisplay'),
@@ -28,24 +29,19 @@ const appState = {
   selectedModalPath: '/data',
   expanded: new Set(['/data']),
   treeData: {},
+  localFiles: [],
 };
 
 function setActiveTab(tab) {
   navItems.forEach((item) => item.classList.toggle('is-active', item.dataset.tab === tab));
   panels.forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === tab));
-
-  const titles = {
-    convert: '图片转换',
-    watch: '自动监听',
-    studio: '视觉与策略',
-  };
-  pageTitle.textContent = titles[tab] || '图片转换';
+  pageTitle.textContent = { convert: '图片转换', watch: '自动监听', studio: '视觉与策略' }[tab] || '图片转换';
 }
 
 async function checkHealth() {
   try {
     const response = await fetch(`${apiBase}/health`);
-    if (!response.ok) throw new Error('health check failed');
+    if (!response.ok) throw new Error();
     const data = await response.json();
     statusBanner.textContent = `服务在线 · 数据根目录 ${data.data_root} · cwebp ${data.cwebp ? '已安装' : '缺失'} · inotifywait ${data.inotifywait ? '已安装' : '缺失'}`;
     statusBanner.className = 'status-banner ok';
@@ -55,13 +51,12 @@ async function checkHealth() {
   }
 }
 
-function collectFormats() {
-  return Array.from(document.querySelectorAll('input[name="inputFormats"]:checked')).map((item) => item.value);
+function collectFormats(name = 'inputFormats') {
+  return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map((item) => item.value);
 }
 
 function pathDepth(path) {
-  if (path === '/data') return 0;
-  return path.replace('/data/', '').split('/').length;
+  return path === '/data' ? 0 : path.replace('/data/', '').split('/').length;
 }
 
 function pathName(path) {
@@ -101,17 +96,11 @@ function renderModalTree() {
     modalTree.innerHTML = '<div class="modal-empty">当前目录下没有可选子文件夹</div>';
     return;
   }
-
-  modalTree.innerHTML = visibleNodes.map((path) => {
-    const depth = pathDepth(path);
-    const expanded = appState.expanded.has(path);
-    const selected = appState.selectedModalPath === path;
-    return `
-      <div class="modal-tree-row ${selected ? 'modal-tree-row--selected' : ''}" style="--depth:${depth}">
-        <button type="button" class="modal-folder-btn ${expanded ? 'is-open' : ''}" data-modal-mode="toggle" data-path="${path}" aria-label="展开目录"><span>📁</span></button>
-        <button type="button" class="modal-path-btn ${selected ? 'is-selected' : ''}" data-modal-mode="select" data-path="${path}"><span class="modal-path-name">${pathName(path)}</span></button>
-      </div>`;
-  }).join('');
+  modalTree.innerHTML = visibleNodes.map((path) => `
+    <div class="modal-tree-row ${appState.selectedModalPath === path ? 'modal-tree-row--selected' : ''}" style="--depth:${pathDepth(path)}">
+      <button type="button" class="modal-folder-btn ${appState.expanded.has(path) ? 'is-open' : ''}" data-modal-mode="toggle" data-path="${path}" aria-label="展开目录"><span>📁</span></button>
+      <button type="button" class="modal-path-btn ${appState.selectedModalPath === path ? 'is-selected' : ''}" data-modal-mode="select" data-path="${path}"><span class="modal-path-name">${pathName(path)}</span></button>
+    </div>`).join('');
 }
 
 async function initializeModalTree() {
@@ -159,6 +148,7 @@ function commitSelectedPath() {
 }
 
 function renderLocalSelection(files) {
+  appState.localFiles = files;
   if (!files.length) {
     localSelectionResult.textContent = '暂未选择本地文件或文件夹';
     return;
@@ -169,17 +159,12 @@ function renderLocalSelection(files) {
 }
 
 navItems.forEach((item) => item.addEventListener('click', () => setActiveTab(item.dataset.tab)));
-
 localUploadTrigger.addEventListener('click', () => localFileInput.click());
 pickFilesBtn.addEventListener('click', () => localFileInput.click());
 pickFolderBtn.addEventListener('click', () => localFolderInput.click());
 localFileInput.addEventListener('change', () => renderLocalSelection(Array.from(localFileInput.files || [])));
 localFolderInput.addEventListener('change', () => renderLocalSelection(Array.from(localFolderInput.files || [])));
-
-localUploadTrigger.addEventListener('dragover', (event) => {
-  event.preventDefault();
-  localUploadTrigger.classList.add('is-dragging');
-});
+localUploadTrigger.addEventListener('dragover', (event) => { event.preventDefault(); localUploadTrigger.classList.add('is-dragging'); });
 localUploadTrigger.addEventListener('dragleave', () => localUploadTrigger.classList.remove('is-dragging'));
 localUploadTrigger.addEventListener('drop', (event) => {
   event.preventDefault();
@@ -187,33 +172,35 @@ localUploadTrigger.addEventListener('drop', (event) => {
   renderLocalSelection(Array.from(event.dataTransfer?.files || []));
 });
 
+localConvertBtn?.addEventListener('click', () => {
+  const localFormats = collectFormats('localInputFormats');
+  if (!appState.localFiles.length) {
+    resultBox.textContent = '请先在“本地文件”区域选择文件或文件夹。';
+    return;
+  }
+  resultBox.textContent = JSON.stringify({
+    mode: 'local-preview',
+    target_format: document.getElementById('localTargetFormat')?.value,
+    quality: Number(document.getElementById('localQuality')?.value || 80),
+    input_formats: localFormats,
+    delete_original: document.getElementById('localDeleteOriginal')?.checked || false,
+    selected_count: appState.localFiles.length,
+    selected_items: appState.localFiles.slice(0, 20).map((file) => file.webkitRelativePath || file.name),
+  }, null, 2);
+});
+
 document.addEventListener('click', async (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
-
   const openPicker = target.closest('[data-open-picker]');
-  if (openPicker instanceof HTMLElement) {
-    await openFolderModal(openPicker.dataset.openPicker);
-    return;
-  }
-
-  if (target.dataset.closeModal === 'true' || target.dataset.cancelModal === 'true') {
-    closeFolderModal();
-    return;
-  }
-
-  if (target === folderModal) {
-    closeFolderModal();
-    return;
-  }
-
+  if (openPicker instanceof HTMLElement) return openFolderModal(openPicker.dataset.openPicker);
+  if (target.dataset.closeModal === 'true' || target.dataset.cancelModal === 'true' || target === folderModal) return closeFolderModal();
   const modalAction = target.closest('[data-modal-mode]');
   if (modalAction instanceof HTMLElement) {
-    const mode = modalAction.dataset.modalMode;
     const path = modalAction.dataset.path;
     if (!path) return;
-    if (mode === 'toggle') return toggleNode(path);
-    if (mode === 'select') return selectNode(path);
+    if (modalAction.dataset.modalMode === 'toggle') return toggleNode(path);
+    if (modalAction.dataset.modalMode === 'select') return selectNode(path);
   }
 });
 
@@ -221,12 +208,11 @@ modalConfirmBtn.addEventListener('click', commitSelectedPath);
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const inputFormats = collectFormats();
+  const inputFormats = collectFormats('inputFormats');
   if (!inputFormats.length) {
     resultBox.textContent = '请至少选择一种需要处理的原始格式。';
     return;
   }
-
   const payload = {
     source_path: pathTargets.source.value.trim(),
     output_path: pathTargets.output.value.trim(),
@@ -235,9 +221,7 @@ form.addEventListener('submit', async (event) => {
     input_formats: inputFormats,
     delete_original: document.getElementById('deleteOriginal').checked,
   };
-
   resultBox.textContent = '正在提交转换任务，请稍候...';
-
   try {
     const response = await fetch(`${apiBase}/convert`, {
       method: 'POST',
