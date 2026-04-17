@@ -2,23 +2,42 @@ const apiBase = window.location.origin;
 const form = document.getElementById('conversion-form');
 const resultBox = document.getElementById('resultBox');
 const statusBanner = document.getElementById('statusBanner');
+const pageTitle = document.getElementById('pageTitle');
+const navItems = Array.from(document.querySelectorAll('.nav-item'));
+const panels = Array.from(document.querySelectorAll('.tab-panel'));
 
 const pickerState = {
   source: {
-    currentPath: '/data',
     selectedPath: '/data',
-    currentEl: document.getElementById('sourceCurrent'),
+    currentPath: '/data',
+    expanded: new Set(['/data']),
+    treeData: {},
     selectedEl: document.getElementById('sourceSelected'),
-    listEl: document.getElementById('sourceFolders'),
+    currentEl: document.getElementById('sourceCurrent'),
+    treeEl: document.getElementById('sourceTree'),
   },
   output: {
-    currentPath: '/data',
     selectedPath: '/data',
-    currentEl: document.getElementById('outputCurrent'),
+    currentPath: '/data',
+    expanded: new Set(['/data']),
+    treeData: {},
     selectedEl: document.getElementById('outputSelected'),
-    listEl: document.getElementById('outputFolders'),
+    currentEl: document.getElementById('outputCurrent'),
+    treeEl: document.getElementById('outputTree'),
   },
 };
+
+function setActiveTab(tab) {
+  navItems.forEach((item) => item.classList.toggle('is-active', item.dataset.tab === tab));
+  panels.forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === tab));
+
+  const titles = {
+    convert: '图片转换',
+    watch: '自动监听',
+    studio: '视觉与策略',
+  };
+  pageTitle.textContent = titles[tab] || '图片转换';
+}
 
 async function checkHealth() {
   try {
@@ -27,7 +46,7 @@ async function checkHealth() {
       throw new Error('health check failed');
     }
     const data = await response.json();
-    statusBanner.textContent = `服务在线 · 数据根目录: ${data.data_root} · cwebp: ${data.cwebp} · inotifywait: ${data.inotifywait}`;
+    statusBanner.textContent = `服务在线 · 数据根目录 ${data.data_root} · cwebp ${data.cwebp ? '已安装' : '缺失'} · inotifywait ${data.inotifywait ? '已安装' : '缺失'}`;
     statusBanner.className = 'status-banner ok';
   } catch (error) {
     statusBanner.textContent = '服务不可达，请检查容器是否正常运行';
@@ -39,70 +58,143 @@ function collectFormats() {
   return Array.from(document.querySelectorAll('input[name="inputFormats"]:checked')).map((item) => item.value);
 }
 
-function renderFolderButtons(type, payload) {
-  const state = pickerState[type];
-  state.currentPath = payload.current_path;
-  state.currentEl.textContent = `当前：${payload.current_path}`;
-  state.selectedEl.textContent = state.selectedPath;
-
-  const segments = [];
-  segments.push(`
-    <button type="button" class="folder-item folder-item--select ${state.selectedPath === payload.current_path ? 'is-active' : ''}" data-picker-type="${type}" data-path="${payload.current_path}" data-mode="select">
-      选择当前目录
-    </button>
-  `);
-
-  if (payload.parent_path) {
-    segments.push(`
-      <button type="button" class="folder-item folder-item--nav" data-picker-type="${type}" data-path="${payload.parent_path}" data-mode="open">
-        ← 返回上级
-      </button>
-    `);
+function nodeDepth(path) {
+  if (path === '/data') {
+    return 0;
   }
-
-  if (payload.directories.length) {
-    payload.directories.forEach((directory) => {
-      segments.push(`
-        <div class="folder-row">
-          <button type="button" class="folder-item folder-item--nav" data-picker-type="${type}" data-path="${directory.path}" data-mode="open">
-            打开 ${directory.name}
-          </button>
-          <button type="button" class="folder-item folder-item--select ${state.selectedPath === directory.path ? 'is-active' : ''}" data-picker-type="${type}" data-path="${directory.path}" data-mode="select">
-            选中 ${directory.name}
-          </button>
-        </div>
-      `);
-    });
-  } else {
-    segments.push('<div class="folder-empty">当前目录下没有子文件夹</div>');
-  }
-
-  state.listEl.innerHTML = segments.join('');
+  return path.replace('/data/', '').split('/').length;
 }
 
-async function loadFolders(type, path = '/data') {
-  const state = pickerState[type];
-  state.listEl.innerHTML = '<div class="folder-empty">正在读取目录...</div>';
+function getNodeName(path) {
+  if (path === '/data') {
+    return 'data';
+  }
+  const parts = path.split('/');
+  return parts[parts.length - 1] || 'data';
+}
 
-  try {
-    const response = await fetch(`${apiBase}/folders?path=${encodeURIComponent(path)}`);
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.detail || '读取目录失败');
+function isDirectChild(parentPath, childPath) {
+  if (parentPath === childPath) {
+    return false;
+  }
+  const parentDepth = nodeDepth(parentPath);
+  const childDepth = nodeDepth(childPath);
+  return childPath.startsWith(`${parentPath}/`) && childDepth === parentDepth + 1;
+}
+
+async function fetchFolders(path) {
+  const response = await fetch(`${apiBase}/folders?path=${encodeURIComponent(path)}`);
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.detail || '读取目录失败');
+  }
+  return data;
+}
+
+async function ensureNodeLoaded(type, path) {
+  const state = pickerState[type];
+  if (state.treeData[path]) {
+    return state.treeData[path];
+  }
+
+  const data = await fetchFolders(path);
+  state.treeData[path] = data;
+  state.currentPath = data.current_path;
+  return data;
+}
+
+function flattenVisibleNodes(type, path = '/data', bucket = []) {
+  const state = pickerState[type];
+  const data = state.treeData[path];
+  if (!data) {
+    return bucket;
+  }
+
+  const directories = data.directories || [];
+  directories.forEach((directory) => {
+    bucket.push(directory.path);
+    if (state.expanded.has(directory.path)) {
+      flattenVisibleNodes(type, directory.path, bucket);
     }
-    renderFolderButtons(type, data);
-  } catch (error) {
-    state.listEl.innerHTML = `<div class="folder-empty">${error.message}</div>`;
+  });
+  return bucket;
+}
+
+function renderTree(type) {
+  const state = pickerState[type];
+  state.selectedEl.textContent = state.selectedPath;
+  state.currentEl.textContent = state.currentPath;
+
+  const visibleNodes = flattenVisibleNodes(type);
+  if (!visibleNodes.length) {
+    state.treeEl.innerHTML = '<div class="tree-empty">当前目录下没有可浏览的子文件夹</div>';
+    return;
   }
+
+  state.treeEl.innerHTML = visibleNodes.map((path) => {
+    const depth = nodeDepth(path);
+    const expanded = state.expanded.has(path);
+    const loaded = Boolean(state.treeData[path]);
+    const selected = state.selectedPath === path;
+    const label = getNodeName(path);
+
+    return `
+      <div class="tree-row ${selected ? 'tree-row--selected' : ''}" style="--depth:${depth}">
+        <button type="button" class="tree-expand ${expanded ? 'is-open' : ''}" data-picker-type="${type}" data-mode="toggle" data-path="${path}" aria-label="展开目录">
+          <span class="folder-glyph">📁</span>
+        </button>
+        <button type="button" class="tree-select ${selected ? 'is-selected' : ''}" data-picker-type="${type}" data-mode="select" data-path="${path}">
+          <span class="tree-name">${label}</span>
+          <span class="tree-path">${path}</span>
+        </button>
+        <span class="tree-state">${loaded ? (expanded ? '已展开' : '可展开') : '未加载'}</span>
+      </div>
+    `;
+  }).join('');
 }
 
-function selectFolder(type, path) {
-  pickerState[type].selectedPath = path;
-  pickerState[type].selectedEl.textContent = path;
-  loadFolders(type, pickerState[type].currentPath);
+async function initializeTree(type) {
+  const state = pickerState[type];
+  state.treeEl.innerHTML = '<div class="tree-empty">正在读取目录...</div>';
+  await ensureNodeLoaded(type, '/data');
+  renderTree(type);
 }
 
-document.addEventListener('click', (event) => {
+async function toggleNode(type, path) {
+  const state = pickerState[type];
+  if (state.expanded.has(path)) {
+    state.expanded.delete(path);
+    state.currentPath = path;
+    renderTree(type);
+    return;
+  }
+
+  await ensureNodeLoaded(type, path);
+  state.expanded.add(path);
+  state.currentPath = path;
+  renderTree(type);
+}
+
+function selectNode(type, path) {
+  const state = pickerState[type];
+  state.selectedPath = path;
+  state.currentPath = path;
+  renderTree(type);
+}
+
+async function refreshTree(type) {
+  const state = pickerState[type];
+  state.treeData = {};
+  state.expanded = new Set(['/data']);
+  state.currentPath = '/data';
+  await initializeTree(type);
+}
+
+navItems.forEach((item) => {
+  item.addEventListener('click', () => setActiveTab(item.dataset.tab));
+});
+
+document.addEventListener('click', async (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) {
     return;
@@ -110,30 +202,29 @@ document.addEventListener('click', (event) => {
 
   const action = target.dataset.action;
   if (action === 'refresh-source') {
-    loadFolders('source', pickerState.source.currentPath);
+    await refreshTree('source');
     return;
   }
-
   if (action === 'refresh-output') {
-    loadFolders('output', pickerState.output.currentPath);
+    await refreshTree('output');
     return;
   }
 
   const pickerType = target.dataset.pickerType;
-  const path = target.dataset.path;
   const mode = target.dataset.mode;
+  const path = target.dataset.path;
 
-  if (!pickerType || !path || !mode) {
+  if (!pickerType || !mode || !path) {
     return;
   }
 
-  if (mode === 'open') {
-    loadFolders(pickerType, path);
+  if (mode === 'toggle') {
+    await toggleNode(pickerType, path);
     return;
   }
 
   if (mode === 'select') {
-    selectFolder(pickerType, path);
+    selectNode(pickerType, path);
   }
 });
 
@@ -177,6 +268,7 @@ form.addEventListener('submit', async (event) => {
   }
 });
 
+setActiveTab('convert');
 checkHealth();
-loadFolders('source', '/data');
-loadFolders('output', '/data');
+initializeTree('source');
+initializeTree('output');

@@ -6,106 +6,308 @@
     <title>图片格式转换控制台</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/styles.css" />
   </head>
   <body>
-    <div class="app-shell">
-      <aside class="hero-panel">
-        <div class="hero-panel__inner">
-          <p class="eyebrow">OVH · Debian 12 · Docker Compose</p>
-          <h1>图片格式转换控制台</h1>
-          <p class="hero-copy">
-            Compose 只挂载一个数据根目录，前端可视化浏览并选择该目录下任意子文件夹作为源目录与输出目录。
-            后端内置 <code>cwebp</code> 与 <code>inotify-tools</code>，转换范围被限制在 <code>/data</code> 内。
-          </p>
-          <ul class="feature-list">
-            <li>支持浏览数据目录中的任意子文件夹</li>
-            <li>目标格式支持 webp / png / jpeg</li>
-            <li>可选删除原图</li>
-            <li>可查看执行日志与处理结果</li>
-          </ul>
+    <div class="aurora aurora--one"></div>
+    <div class="aurora aurora--two"></div>
+    <div class="shell">
+      <aside class="sidebar glass-card">
+        <div class="brand-block">
+          <div class="brand-mark">◎</div>
+          <div>
+            <p class="brand-eyebrow">Media Pipeline</p>
+            <h1>图片转换控制台</h1>
+          </div>
+        </div>
+
+        <nav class="side-nav">
+          <button class="nav-item is-active" data-tab="convert">
+            <span class="nav-icon">◫</span>
+            <div>
+              <strong>图片转换</strong>
+              <small>手动选目录，一次性批量转换</small>
+            </div>
+          </button>
+          <button class="nav-item" data-tab="watch">
+            <span class="nav-icon">◌</span>
+            <div>
+              <strong>自动监听</strong>
+              <small>监听目录变化并自动处理</small>
+            </div>
+          </button>
+          <button class="nav-item" data-tab="studio">
+            <span class="nav-icon">✦</span>
+            <div>
+              <strong>视觉与策略</strong>
+              <small>背景图、命名与输出偏好</small>
+            </div>
+          </button>
+        </nav>
+
+        <div class="sidebar-note glass-panel">
+          <p class="panel-kicker">服务状态</p>
+          <div id="statusBanner" class="status-banner pending">正在检测服务...</div>
+          <p class="muted-copy">单容器部署、单数据根目录、前端后端统一入口。</p>
         </div>
       </aside>
 
-      <main class="workspace-panel">
-        <section class="card form-card">
-          <div class="section-heading">
-            <span class="section-kicker">任务配置</span>
-            <h2>创建一次图片转换任务</h2>
+      <main class="content">
+        <header class="topbar glass-card">
+          <div>
+            <p class="panel-kicker">OVH · Debian 12 · Docker Compose</p>
+            <h2 id="pageTitle">图片转换</h2>
+          </div>
+          <div class="topbar-badge">ghcr.io/lc010224/img-converter:latest</div>
+        </header>
+
+        <section class="tab-panel is-active" data-panel="convert">
+          <div class="hero-card glass-card">
+            <div>
+              <p class="panel-kicker">批量任务</p>
+              <h3>创建一次图片批量转换任务</h3>
+              <p class="hero-copy">
+                以更稳的树状目录选择器选择源目录与输出目录，支持按图片格式过滤、质量控制与删除原图。
+              </p>
+            </div>
+            <div class="hero-stats">
+              <div class="stat-pill">
+                <span>根目录</span>
+                <strong>/data</strong>
+              </div>
+              <div class="stat-pill">
+                <span>支持格式</span>
+                <strong>webp / jpeg / png</strong>
+              </div>
+            </div>
           </div>
 
-          <form id="conversion-form" class="config-form">
-            <div class="folder-picker" data-picker="source">
-              <div class="picker-header">
+          <form id="conversion-form" class="workspace-grid">
+            <section class="glass-card main-card">
+              <div class="card-head">
                 <div>
-                  <span>源图片目录</span>
-                  <p id="sourceSelected" class="selected-path">/data</p>
+                  <p class="panel-kicker">目录选择</p>
+                  <h3>源目录与输出目录</h3>
                 </div>
-                <button type="button" class="picker-refresh" data-action="refresh-source">刷新</button>
+                <div class="chip-row">
+                  <span class="soft-chip">点击文件夹图标展开</span>
+                  <span class="soft-chip">点击名称选中本级</span>
+                </div>
               </div>
-              <div class="folder-browser">
-                <div id="sourceCurrent" class="folder-current">当前：/data</div>
-                <div id="sourceFolders" class="folder-list"></div>
-              </div>
-            </div>
 
-            <div class="folder-picker" data-picker="output">
-              <div class="picker-header">
+              <div class="picker-grid">
+                <article class="tree-card" data-picker="source">
+                  <div class="tree-card__head">
+                    <div>
+                      <p class="tree-title">源图片目录</p>
+                      <p id="sourceSelected" class="tree-selected">/data</p>
+                    </div>
+                    <button type="button" class="tiny-btn" data-action="refresh-source">刷新</button>
+                  </div>
+                  <div class="tree-current-row">
+                    <span class="tree-current-label">当前路径</span>
+                    <strong id="sourceCurrent" class="tree-current-path">/data</strong>
+                  </div>
+                  <div id="sourceTree" class="tree-list"></div>
+                </article>
+
+                <article class="tree-card" data-picker="output">
+                  <div class="tree-card__head">
+                    <div>
+                      <p class="tree-title">输出目录</p>
+                      <p id="outputSelected" class="tree-selected">/data</p>
+                    </div>
+                    <button type="button" class="tiny-btn" data-action="refresh-output">刷新</button>
+                  </div>
+                  <div class="tree-current-row">
+                    <span class="tree-current-label">当前路径</span>
+                    <strong id="outputCurrent" class="tree-current-path">/data</strong>
+                  </div>
+                  <div id="outputTree" class="tree-list"></div>
+                </article>
+              </div>
+            </section>
+
+            <aside class="glass-card side-card">
+              <div class="card-head compact">
                 <div>
-                  <span>输出目录</span>
-                  <p id="outputSelected" class="selected-path">/data</p>
+                  <p class="panel-kicker">转换参数</p>
+                  <h3>输出规则</h3>
                 </div>
-                <button type="button" class="picker-refresh" data-action="refresh-output">刷新</button>
               </div>
-              <div class="folder-browser">
-                <div id="outputCurrent" class="folder-current">当前：/data</div>
-                <div id="outputFolders" class="folder-list"></div>
+
+              <div class="form-stack">
+                <label>
+                  <span>目标格式</span>
+                  <select id="targetFormat" name="targetFormat">
+                    <option value="webp">webp</option>
+                    <option value="jpeg">jpeg</option>
+                    <option value="png">png</option>
+                  </select>
+                </label>
+
+                <label>
+                  <span>转换质量</span>
+                  <input id="quality" name="quality" type="number" min="1" max="100" value="80" required />
+                </label>
+
+                <label>
+                  <span>需要处理的原始格式</span>
+                  <div class="checkbox-group">
+                    <label><input type="checkbox" name="inputFormats" value="jpg" checked /> jpg</label>
+                    <label><input type="checkbox" name="inputFormats" value="jpeg" checked /> jpeg</label>
+                    <label><input type="checkbox" name="inputFormats" value="png" checked /> png</label>
+                    <label><input type="checkbox" name="inputFormats" value="webp" /> webp</label>
+                  </div>
+                </label>
+
+                <label class="toggle-row">
+                  <input id="deleteOriginal" name="deleteOriginal" type="checkbox" />
+                  <span>转换成功后删除原图</span>
+                </label>
+
+                <button type="submit" class="primary-btn">开始转换</button>
               </div>
-            </div>
-
-            <div class="grid-two">
-              <label>
-                <span>目标格式</span>
-                <select id="targetFormat" name="targetFormat">
-                  <option value="webp">webp</option>
-                  <option value="jpeg">jpeg</option>
-                  <option value="png">png</option>
-                </select>
-              </label>
-
-              <label>
-                <span>转换质量</span>
-                <input id="quality" name="quality" type="number" min="1" max="100" value="80" required />
-              </label>
-            </div>
-
-            <label>
-              <span>需要处理的原始格式</span>
-              <div class="checkbox-group">
-                <label><input type="checkbox" name="inputFormats" value="jpg" checked /> jpg</label>
-                <label><input type="checkbox" name="inputFormats" value="jpeg" checked /> jpeg</label>
-                <label><input type="checkbox" name="inputFormats" value="png" checked /> png</label>
-                <label><input type="checkbox" name="inputFormats" value="webp" /> webp</label>
-              </div>
-            </label>
-
-            <label class="toggle-row">
-              <input id="deleteOriginal" name="deleteOriginal" type="checkbox" />
-              <span>转换成功后删除原图</span>
-            </label>
-
-            <button type="submit" class="primary-btn">开始转换</button>
+            </aside>
           </form>
+
+          <section class="glass-card result-card">
+            <div class="card-head compact">
+              <div>
+                <p class="panel-kicker">最近结果</p>
+                <h3>执行日志与返回内容</h3>
+              </div>
+            </div>
+            <pre id="resultBox" class="result-box">等待执行任务...</pre>
+          </section>
         </section>
 
-        <section class="card status-card">
-          <div class="section-heading">
-            <span class="section-kicker">服务状态</span>
-            <h2>后端连通性与最近结果</h2>
+        <section class="tab-panel" data-panel="watch">
+          <div class="glass-card watch-layout">
+            <div class="card-head">
+              <div>
+                <p class="panel-kicker">自动监听</p>
+                <h3>监听目录变化并自动转换</h3>
+              </div>
+              <span class="soft-chip">UI 已准备，可继续接入后端监听任务</span>
+            </div>
+
+            <div class="watch-grid">
+              <div class="glass-panel form-stack">
+                <label>
+                  <span>监听原目录</span>
+                  <input value="/data/watch/input" />
+                </label>
+                <label>
+                  <span>输出目录</span>
+                  <input value="/data/watch/output" />
+                </label>
+                <div class="two-cols">
+                  <label>
+                    <span>监听间隔（秒）</span>
+                    <input type="number" value="15" />
+                  </label>
+                  <label>
+                    <span>输出格式</span>
+                    <select>
+                      <option>webp</option>
+                      <option>jpeg</option>
+                      <option>png</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="two-cols">
+                  <label>
+                    <span>质量</span>
+                    <input type="number" value="82" />
+                  </label>
+                  <label>
+                    <span>文件命名策略</span>
+                    <select>
+                      <option>保持原名</option>
+                      <option>添加时间戳</option>
+                      <option>添加后缀</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="checkbox-group stacked">
+                  <label><input type="checkbox" checked /> 自动创建输出目录</label>
+                  <label><input type="checkbox" checked /> 忽略隐藏文件</label>
+                  <label><input type="checkbox" /> 转换后删除原图</label>
+                  <label><input type="checkbox" checked /> 启动容器后自动恢复监听</label>
+                </div>
+                <button type="button" class="primary-btn secondary-tone">保存监听配置</button>
+              </div>
+
+              <div class="glass-panel preview-panel">
+                <p class="panel-kicker">建议增强项</p>
+                <ul class="feature-list compact-list">
+                  <li>监听日志滚动窗口</li>
+                  <li>失败重试次数配置</li>
+                  <li>最大并发转换数</li>
+                  <li>夜间低频模式</li>
+                  <li>格式白名单/黑名单</li>
+                  <li>按子目录生成独立输出目录</li>
+                </ul>
+              </div>
+            </div>
           </div>
-          <div id="statusBanner" class="status-banner pending">正在检测后端状态...</div>
-          <pre id="resultBox" class="result-box">等待执行任务...</pre>
+        </section>
+
+        <section class="tab-panel" data-panel="studio">
+          <div class="studio-grid">
+            <section class="glass-card">
+              <div class="card-head compact">
+                <div>
+                  <p class="panel-kicker">视觉与背景</p>
+                  <h3>界面表现配置</h3>
+                </div>
+              </div>
+              <div class="form-stack">
+                <label>
+                  <span>背景图 URL</span>
+                  <input value="https://images.example.com/cover.jpg" />
+                </label>
+                <label>
+                  <span>主题风格</span>
+                  <select>
+                    <option>暗色玻璃</option>
+                    <option>柔光浅色</option>
+                    <option>极夜蓝调</option>
+                  </select>
+                </label>
+                <label>
+                  <span>结果展示方式</span>
+                  <select>
+                    <option>原始 JSON</option>
+                    <option>摘要优先</option>
+                    <option>表格优先</option>
+                  </select>
+                </label>
+                <button type="button" class="primary-btn secondary-tone">保存界面配置</button>
+              </div>
+            </section>
+
+            <section class="glass-card">
+              <div class="card-head compact">
+                <div>
+                  <p class="panel-kicker">输出策略</p>
+                  <h3>默认行为模板</h3>
+                </div>
+              </div>
+              <div class="checkbox-group stacked spacious">
+                <label><input type="checkbox" checked /> 默认保留目录结构</label>
+                <label><input type="checkbox" checked /> 默认启用质量压缩</label>
+                <label><input type="checkbox" /> 默认覆盖已有输出文件</label>
+                <label><input type="checkbox" checked /> 默认显示完整路径</label>
+              </div>
+              <div class="glass-panel tip-panel">
+                <p class="tip-title">说明</p>
+                <p>这个页面先作为未来配置中心入口，后续可以继续接入真实持久化配置接口。</p>
+              </div>
+            </section>
+          </div>
         </section>
       </main>
     </div>
