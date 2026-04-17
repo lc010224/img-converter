@@ -118,7 +118,6 @@ function renderModalTree() {
     const depth = pathDepth(path);
     const expanded = appState.expanded.has(path);
     const selected = appState.selectedModalPath === path;
-    const loaded = Boolean(appState.treeData[path]);
 
     return `
       <div class="modal-tree-row ${selected ? 'modal-tree-row--selected' : ''}" style="--depth:${depth}">
@@ -128,7 +127,6 @@ function renderModalTree() {
         <button type="button" class="modal-path-btn ${selected ? 'is-selected' : ''}" data-modal-mode="select" data-path="${path}">
           <span class="modal-path-name">${pathName(path)}</span>
         </button>
-        <span class="modal-path-state">${loaded ? '可用' : '未加载'}</span>
       </div>
     `;
   }).join('');

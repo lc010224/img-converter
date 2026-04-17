@@ -422,11 +422,15 @@ select:focus {
   overflow: hidden;
 }
 
+.modal-card--compact {
+  width: min(620px, 100%);
+}
+
 .modal-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 22px 24px 16px;
+  padding: 22px 24px 12px;
 }
 
 .modal-head h3 {
@@ -449,59 +453,62 @@ select:focus {
   min-height: 380px;
   max-height: 56vh;
   overflow: auto;
-  padding: 0 22px 18px;
+  padding: 6px 24px 18px;
   display: grid;
-  gap: 10px;
+  gap: 4px;
 }
 
 .modal-tree-row {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
-  gap: 10px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px;
   align-items: center;
-  padding-left: calc(var(--depth) * 20px);
-}
-
-.modal-tree-row--selected .modal-path-btn {
-  background: #5f7cff;
-  color: #fff;
-  border-color: #5f7cff;
+  padding: 4px 0 4px calc(var(--depth) * 18px);
 }
 
 .modal-folder-btn,
 .modal-path-btn,
 .footer-btn {
-  min-height: 46px;
-  border-radius: 12px;
-  border: 1px solid #d7e0eb;
-  background: #fff;
   color: var(--text);
 }
 
 .modal-folder-btn {
-  width: 44px;
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: transparent;
   padding: 0;
   font-size: 18px;
+  border-radius: 8px;
 }
 
+.modal-folder-btn:hover,
 .modal-folder-btn.is-open {
-  background: #eef2ff;
-  border-color: #d9e3ff;
+  background: #f2f5fb;
 }
 
 .modal-path-btn {
   width: 100%;
-  padding: 0 14px;
+  min-height: 34px;
+  border: none;
+  background: transparent;
   text-align: left;
+  padding: 0 8px;
+  border-radius: 8px;
+}
+
+.modal-path-btn:hover {
+  background: #f6f8fc;
+}
+
+.modal-tree-row--selected .modal-path-btn,
+.modal-path-btn.is-selected {
+  background: #eef2ff;
+  color: #3151d3;
 }
 
 .modal-path-name {
   font-size: 14px;
-}
-
-.modal-path-state {
-  color: var(--muted);
-  font-size: 12px;
 }
 
 .modal-empty {
@@ -517,7 +524,7 @@ select:focus {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px 24px 22px;
+  padding: 16px 24px 20px;
   border-top: 1px solid #edf2f7;
 }
 
@@ -532,7 +539,11 @@ select:focus {
 }
 
 .footer-btn {
+  min-height: 42px;
   padding: 0 18px;
+  border-radius: 12px;
+  border: 1px solid #d7e0eb;
+  background: #fff;
 }
 
 .footer-btn--primary {
@@ -561,16 +572,16 @@ select:focus {
     grid-template-columns: 1fr;
   }
 
-  .path-input-wrap,
+  .path-input-wrap {
+    grid-template-columns: 1fr 56px;
+  }
+
   .modal-tree-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: 34px minmax(0, 1fr);
     padding-left: 0;
   }
 
-  .folder-trigger,
-  .modal-folder-btn,
-  .modal-path-btn,
-  .footer-btn {
-    width: 100%;
+  .folder-trigger {
+    width: 56px;
   }
 }
