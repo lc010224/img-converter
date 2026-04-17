@@ -157,6 +157,90 @@ select:focus {
   width: auto;
 }
 
+.folder-picker {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(115, 255, 209, 0.12);
+  background: rgba(6, 12, 18, 0.4);
+}
+
+.picker-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.selected-path {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.picker-refresh {
+  border: 1px solid rgba(155, 178, 198, 0.24);
+  background: rgba(8, 16, 24, 0.82);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.folder-browser {
+  display: grid;
+  gap: 12px;
+}
+
+.folder-current {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(3, 8, 13, 0.58);
+  color: var(--accent);
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.folder-list {
+  display: grid;
+  gap: 10px;
+}
+
+.folder-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.folder-item {
+  border: 1px solid rgba(155, 178, 198, 0.22);
+  background: rgba(8, 16, 24, 0.82);
+  color: var(--text);
+  padding: 12px 14px;
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.folder-item--select {
+  white-space: nowrap;
+}
+
+.folder-item.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(115, 255, 209, 0.12);
+  color: var(--accent);
+}
+
+.folder-empty {
+  padding: 16px;
+  border-radius: 14px;
+  background: rgba(3, 8, 13, 0.58);
+  color: var(--muted);
+}
+
 .primary-btn {
   border: none;
   border-radius: 16px;
@@ -235,7 +319,10 @@ select:focus {
     padding: 24px;
   }
 
-  .grid-two {
+  .grid-two,
+  .folder-row,
+  .picker-header {
     grid-template-columns: 1fr;
+    display: grid;
   }
 }

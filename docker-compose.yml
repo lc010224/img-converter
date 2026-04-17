@@ -5,8 +5,7 @@ services:
     container_name: image-converter-backend
     restart: unless-stopped
     volumes:
-      - ${HOST_SOURCE_DIR:-/opt/image-converter-data/source}:/data/source
-      - ${HOST_OUTPUT_DIR:-/opt/image-converter-data/output}:/data/output
+      - ${HOST_DATA_DIR:-/opt/image-converter-data}:/data
     ports:
       - "8000:8000"
 

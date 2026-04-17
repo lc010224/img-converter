@@ -3,7 +3,7 @@ import shutil
 import subprocess
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from PIL import Image
@@ -17,6 +17,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+DATA_ROOT = Path("/data")
 SUPPORTED_INPUTS = {"jpg", "jpeg", "png", "webp"}
 SUPPORTED_OUTPUTS = {"webp", "jpeg", "png"}
 
@@ -30,19 +31,76 @@ class ConvertRequest(BaseModel):
     delete_original: bool = False
 
 
+def ensure_data_root() -> None:
+    DATA_ROOT.mkdir(parents=True, exist_ok=True)
+
+
+def resolve_data_path(raw_path: str) -> Path:
+    ensure_data_root()
+    requested = raw_path.strip()
+    if not requested:
+        raise HTTPException(status_code=400, detail="路径不能为空")
+
+    candidate = Path(requested)
+    if not candidate.is_absolute():
+        candidate = DATA_ROOT / candidate
+
+    try:
+        resolved = candidate.resolve(strict=False)
+        resolved.relative_to(DATA_ROOT.resolve())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="路径必须位于 /data 目录内") from exc
+
+    return resolved
+
+
+def to_display_path(path: Path) -> str:
+    root = DATA_ROOT.resolve()
+    resolved = path.resolve(strict=False)
+    if resolved == root:
+        return "/data"
+    return f"/data/{resolved.relative_to(root).as_posix()}"
+
+
 @app.get("/health")
 def health():
+    ensure_data_root()
     return {
         "status": "ok",
+        "data_root": str(DATA_ROOT),
         "cwebp": shutil.which("cwebp") is not None,
         "inotifywait": shutil.which("inotifywait") is not None,
     }
 
 
+@app.get("/folders")
+def list_folders(path: str = Query(default="/data")):
+    current_path = resolve_data_path(path)
+    if not current_path.exists() or not current_path.is_dir():
+        raise HTTPException(status_code=404, detail="目录不存在")
+
+    directories = sorted(item for item in current_path.iterdir() if item.is_dir())
+    parent = None
+    if current_path.resolve() != DATA_ROOT.resolve():
+        parent = to_display_path(current_path.parent)
+
+    return {
+        "current_path": to_display_path(current_path),
+        "parent_path": parent,
+        "directories": [
+            {
+                "name": item.name,
+                "path": to_display_path(item),
+            }
+            for item in directories
+        ],
+    }
+
+
 @app.post("/convert")
 def convert_images(request: ConvertRequest):
-    source_dir = Path(request.source_path)
-    output_dir = Path(request.output_path)
+    source_dir = resolve_data_path(request.source_path)
+    output_dir = resolve_data_path(request.output_path)
 
     if not source_dir.exists() or not source_dir.is_dir():
         raise HTTPException(status_code=400, detail="源目录不存在或不是目录")
@@ -93,15 +151,15 @@ def convert_images(request: ConvertRequest):
                     working_image.save(target_path, save_format, **save_kwargs)
 
             converted.append({
-                'source': str(file_path),
-                'output': str(target_path),
+                'source': to_display_path(file_path),
+                'output': to_display_path(target_path),
             })
 
             if request.delete_original:
                 file_path.unlink()
         except Exception as exc:
             errors.append({
-                'source': str(file_path),
+                'source': to_display_path(file_path),
                 'error': str(exc),
             })
 
@@ -109,8 +167,9 @@ def convert_images(request: ConvertRequest):
         skipped.append('没有匹配到可转换的图片文件')
 
     return {
-        'source_path': str(source_dir),
-        'output_path': str(output_dir),
+        'data_root': str(DATA_ROOT),
+        'source_path': to_display_path(source_dir),
+        'output_path': to_display_path(output_dir),
         'target_format': request.target_format,
         'quality': request.quality,
         'delete_original': request.delete_original,

@@ -2,16 +2,11 @@
 
 这是一个可直接部署在 OVH 服务器（Debian 12）上的 Docker Compose 项目，提供：
 
-- 前端：可视化表单，配置图片转换任务
+- 前端：可视化目录浏览与图片转换配置
 - 后端：执行图片格式转换 API
 - 后端镜像内自动安装 `cwebp` 和 `inotify-tools`
-- 支持设置：
-  - 需要转换的服务器本地图片路径
-  - 转换后保存路径
-  - 输出格式
-  - 转换质量
-  - 是否删除原图
-  - 指定需要处理的原始图片格式
+- Compose 只挂载一个宿主机数据目录到容器 `/data`
+- 前端可直接选择 `/data` 下任意子文件夹作为源目录和输出目录
 
 ## 项目结构
 
@@ -30,32 +25,19 @@
 └─ docker-compose.yml
 ```
 
-## 功能说明
+## 当前实现方式
 
-前端页面中可以设置：
+现在 `docker-compose.yml` 只挂载一个宿主机数据根目录：
 
-- 源图片目录，例如 `/data/source`
-- 输出目录，例如 `/data/output`
-- 目标格式：`webp` / `jpeg` / `png`
-- 图片质量：1-100
-- 需要处理的输入格式：`jpg` / `jpeg` / `png` / `webp`
-- 是否在转换成功后删除原图
+- `${HOST_DATA_DIR:-/opt/image-converter-data}` -> `/data`
 
-后端会递归扫描源目录中的文件，并将转换后的结果输出到目标目录，保留相对目录结构。
+这样前端和后端都只围绕 `/data` 工作：
 
-## 更安全的目录挂载方式
+- 源目录必须从 `/data` 下选择
+- 输出目录必须从 `/data` 下选择
+- 后端拒绝访问 `/data` 之外的路径
 
-现在 `docker-compose.yml` 不再挂载宿主机根目录 `/`，而是只挂载两个明确的数据目录：
-
-- 宿主机输入目录 -> 容器内 `/data/source`
-- 宿主机输出目录 -> 容器内 `/data/output`
-
-默认映射为：
-
-- `${HOST_SOURCE_DIR:-/opt/image-converter-data/source}` -> `/data/source`
-- `${HOST_OUTPUT_DIR:-/opt/image-converter-data/output}` -> `/data/output`
-
-这比直接挂载整个服务器根目录更安全，也更适合生产环境。
+这比挂载整个服务器根目录更安全，也更符合你要的“在数据目录下自由选任意文件夹”的需求。
 
 ## OVH Debian 12 安装方式
 
@@ -80,31 +62,23 @@ sudo systemctl start docker
 
 ### 1. 上传项目到服务器
 
-把整个项目目录上传到 OVH 服务器，例如：
-
 ```bash
 scp -r 图片格式转换 user@your-server-ip:/opt/image-converter
 ```
 
-### 2. 准备宿主机目录
-
-在服务器上创建输入和输出目录：
+### 2. 准备数据目录
 
 ```bash
-sudo mkdir -p /opt/image-converter-data/source
-sudo mkdir -p /opt/image-converter-data/output
+sudo mkdir -p /opt/image-converter-data
 ```
 
-把要转换的图片放到：
+你可以在这个目录下自由建立任意层级的子目录，例如：
 
-```text
-/opt/image-converter-data/source
-```
-
-转换结果会输出到：
-
-```text
-/opt/image-converter-data/output
+```bash
+sudo mkdir -p /opt/image-converter-data/raw/2025/album-a
+sudo mkdir -p /opt/image-converter-data/raw/2025/album-b
+sudo mkdir -p /opt/image-converter-data/converted/webp
+sudo mkdir -p /opt/image-converter-data/converted/jpeg
 ```
 
 ### 3. 进入项目目录
@@ -115,21 +89,19 @@ cd /opt/image-converter
 
 ### 4. 启动服务
 
-如果使用默认目录，直接运行：
+如果使用默认目录：
 
 ```bash
 sudo docker compose up -d --build
 ```
 
-如果你要自定义宿主机目录，可以这样运行：
+如果要自定义宿主机数据目录：
 
 ```bash
-HOST_SOURCE_DIR=/your/source/path HOST_OUTPUT_DIR=/your/output/path sudo -E docker compose up -d --build
+HOST_DATA_DIR=/your/data/root sudo -E docker compose up -d --build
 ```
 
 ### 5. 打开前端页面
-
-浏览器访问：
 
 ```text
 http://你的服务器IP:8080
@@ -144,58 +116,68 @@ http://你的服务器IP:8000
 ## 使用说明
 
 1. 打开前端页面
-2. 源目录填写：`/data/source`
-3. 输出目录填写：`/data/output`
-4. 选择目标格式、质量、输入格式
-5. 按需勾选“转换成功后删除原图”
-6. 点击“开始转换”
-7. 页面会显示转换结果 JSON，包括成功数、失败数和具体文件
+2. 在“源图片目录”区域中浏览 `/data` 下的目录结构
+3. 进入任意子目录后，点击“选中”作为待转换目录
+4. 在“输出目录”区域中浏览 `/data` 下的目录结构
+5. 进入任意子目录后，点击“选中”作为输出目录
+6. 设置目标格式、质量、输入格式、是否删除原图
+7. 点击“开始转换”
 
-如果你使用了自定义挂载路径，也仍然填写容器内路径：
+## 目录选择规则
 
-- 输入：`/data/source`
-- 输出：`/data/output`
+- 前端只能浏览 `/data` 下的目录
+- 后端也只接受 `/data` 下的路径
+- 这样可以避免用户误操作到服务器其他系统目录
+- 你可以在宿主机数据目录下提前创建任意业务目录结构，前端会直接显示这些子目录
 
-因为前端填写的是容器内路径，不是宿主机绝对路径。
+## 示例目录映射关系
+
+如果宿主机目录是：
+
+```text
+/opt/image-converter-data/raw/2025/album-a
+```
+
+那么前端里看到并选择的路径会是：
+
+```text
+/data/raw/2025/album-a
+```
+
+如果宿主机输出目录是：
+
+```text
+/opt/image-converter-data/converted/webp
+```
+
+那么前端里选择的输出路径会是：
+
+```text
+/data/converted/webp
+```
 
 ## 运行检查
 
-查看容器状态：
-
 ```bash
 sudo docker compose ps
-```
-
-查看日志：
-
-```bash
 sudo docker compose logs -f backend
 sudo docker compose logs -f frontend
-```
-
-后端健康检查：
-
-```bash
 curl http://127.0.0.1:8000/health
 ```
 
-如果正常，返回结果中会看到：
+还可以测试目录浏览接口：
 
-- `status: ok`
-- `cwebp: true`
-- `inotifywait: true`
+```bash
+curl "http://127.0.0.1:8000/folders?path=/data"
+```
 
 ## 注意事项
 
-- 当前版本只挂载输入和输出目录，避免暴露整台服务器文件系统。
-- 如果要处理别的目录，请通过 `HOST_SOURCE_DIR` 和 `HOST_OUTPUT_DIR` 指定，而不是重新挂载根目录。
-- 如果图片很多，首次转换可能需要一些时间。
-- 转成 `webp` 时使用的是 `cwebp`。
-- 转成 `jpeg` / `png` 时使用的是 Pillow。
-
-## GitHub 上传
-
-当前项目已经上传到：
+- 如果某个子目录没有出现在前端，先确认它确实存在于宿主机数据目录下。
+- 输出目录如果不存在，后端在转换时会自动创建。
+- 转成 `webp` 时使用 `cwebp`。
+- 转成 `jpeg` / `png` 时使用 Pillow。
+- 当前项目仓库：
 
 ```text
 https://github.com/lc010224/img-converter.git
