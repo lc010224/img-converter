@@ -1,8 +1,6 @@
 services:
   img-converter:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
+    image: ghcr.io/lc010224/img-converter:latest
     container_name: img-converter
     restart: unless-stopped
     ports:
