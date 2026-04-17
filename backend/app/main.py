@@ -5,8 +5,16 @@ from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from PIL import Image
+
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+DATA_ROOT = Path("/data")
+SUPPORTED_INPUTS = {"jpg", "jpeg", "png", "webp"}
+SUPPORTED_OUTPUTS = {"webp", "jpeg", "png"}
 
 app = FastAPI(title="Image Converter API")
 app.add_middleware(
@@ -16,10 +24,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-DATA_ROOT = Path("/data")
-SUPPORTED_INPUTS = {"jpg", "jpeg", "png", "webp"}
-SUPPORTED_OUTPUTS = {"webp", "jpeg", "png"}
+app.mount("/assets", StaticFiles(directory=STATIC_DIR), name="assets")
 
 
 class ConvertRequest(BaseModel):
@@ -60,6 +65,11 @@ def to_display_path(path: Path) -> str:
     if resolved == root:
         return "/data"
     return f"/data/{resolved.relative_to(root).as_posix()}"
+
+
+@app.get("/")
+def index():
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/health")

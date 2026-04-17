@@ -1,183 +1,236 @@
 # 图片格式转换控制台
 
-这是一个可直接部署在 OVH 服务器（Debian 12）上的 Docker Compose 项目，提供：
+这是一个可直接部署在 OVH 服务器（Debian 12）上的单容器 Docker Compose 项目。
 
-- 前端：可视化目录浏览与图片转换配置
-- 后端：执行图片格式转换 API
-- 后端镜像内自动安装 `cwebp` 和 `inotify-tools`
-- Compose 只挂载一个宿主机数据目录到容器 `/data`
-- 前端可直接选择 `/data` 下任意子文件夹作为源目录和输出目录
+现在已经改成你更喜欢的这种形式：
 
-## 项目结构
+- `compose` 里只有一个服务
+- 一个容器同时提供前端页面和后端 API
+- 只挂载一个宿主机数据目录到容器 `/data`
+- 前端可以在 `/data` 下自由选择任意子文件夹作为源目录和目标目录
 
-```text
-.
-├─ backend/
-│  ├─ app/
-│  │  └─ main.py
-│  ├─ Dockerfile
-│  └─ requirements.txt
-├─ frontend/
-│  ├─ app.js
-│  ├─ Dockerfile
-│  ├─ index.html
-│  └─ styles.css
-└─ docker-compose.yml
+## 当前 compose 形式
+
+```yaml
+services:
+  img-converter:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: img-converter
+    restart: unless-stopped
+    ports:
+      - "3115:7745"
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - /home/img-converter/data:/data
 ```
 
-## 当前实现方式
+这已经非常接近你给的 `homebox` 示例风格。
 
-现在 `docker-compose.yml` 只挂载一个宿主机数据根目录：
+## 为什么我这里不是直接写 `image: xxx:latest`
 
-- `${HOST_DATA_DIR:-/opt/image-converter-data}` -> `/data`
+因为你这个项目当前是**本地源码构建**方式，不是已经发布好的公共镜像。
 
-这样前端和后端都只围绕 `/data` 工作：
+也就是说，现在用的是：
 
-- 源目录必须从 `/data` 下选择
-- 输出目录必须从 `/data` 下选择
-- 后端拒绝访问 `/data` 之外的路径
-
-这比挂载整个服务器根目录更安全，也更符合你要的“在数据目录下自由选任意文件夹”的需求。
-
-## OVH Debian 12 安装方式
-
-先在服务器上安装 Docker 与 Docker Compose 插件：
-
-```bash
-sudo apt update
-sudo apt install -y ca-certificates curl gnupg
-sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-sudo chmod a+r /etc/apt/keyrings/docker.gpg
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
-  $(. /etc/os-release && echo $VERSION_CODENAME) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-sudo systemctl enable docker
-sudo systemctl start docker
+```yaml
+build:
+  context: .
+  dockerfile: backend/Dockerfile
 ```
 
-## Docker Compose 部署步骤
+含义是：
 
-### 1. 上传项目到服务器
+- 直接用你本地项目源码构建镜像
+- 每次你改了代码，都可以重新构建
+- 不依赖远程镜像仓库
 
-```bash
-scp -r 图片格式转换 user@your-server-ip:/opt/image-converter
+这很适合你当前开发阶段。
+
+## `latest` 标签的镜像是什么意思
+
+像你给的这个：
+
+```yaml
+image: ghcr.io/sysadminsmedia/homebox:latest
 ```
 
-### 2. 准备数据目录
+含义是：
 
-```bash
-sudo mkdir -p /opt/image-converter-data
-```
+- `ghcr.io/sysadminsmedia/homebox` 是镜像仓库地址
+- `latest` 是镜像标签
+- Compose 启动时会拉取这个远程镜像来运行
 
-你可以在这个目录下自由建立任意层级的子目录，例如：
+但要注意：
 
-```bash
-sudo mkdir -p /opt/image-converter-data/raw/2025/album-a
-sudo mkdir -p /opt/image-converter-data/raw/2025/album-b
-sudo mkdir -p /opt/image-converter-data/converted/webp
-sudo mkdir -p /opt/image-converter-data/converted/jpeg
-```
+- `latest` 不是“自动更新”
+- `latest` 只是一个标签名
+- 只有镜像仓库里有人重新推送了新的 `latest`，你重新拉取，容器才会用到新版本
 
-### 3. 进入项目目录
+## 你这个项目以后可以用 `latest` 吗
+
+可以，但前提是：
+
+1. 你要先把镜像发布到 Docker Hub 或 GitHub Container Registry
+2. 每次你更新代码后，要重新构建并推送镜像
+3. 然后服务器再 `pull` 新镜像并重启容器
+
+也就是说，可以做到，但要多一步“发布镜像”。
+
+## 你现在这种项目，更新最简单的方式
+
+因为你现在是源码 + compose 构建模式，所以更新最简单：
+
+### 本地改完并提交后
+
+如果服务器上也是这个项目源码目录，直接执行：
 
 ```bash
 cd /opt/image-converter
+sudo docker compose up -d --build
 ```
 
-### 4. 启动服务
+这会：
 
-如果使用默认目录：
+- 重新读取最新代码
+- 重新构建镜像
+- 用新镜像重建容器
+
+这就是你当前最适合的更新方式。
+
+## 如果以后你想改成 `image: yourname/img-converter:latest`
+
+你可以这样做。
+
+### compose 写法会变成
+
+```yaml
+services:
+  img-converter:
+    image: yourname/img-converter:latest
+    container_name: img-converter
+    restart: unless-stopped
+    ports:
+      - "3115:7745"
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - /home/img-converter/data:/data
+```
+
+### 你本地每次发版时
+
+构建并推送镜像：
+
+```bash
+docker build -f backend/Dockerfile -t yourname/img-converter:latest .
+docker push yourname/img-converter:latest
+```
+
+### 服务器更新时
+
+```bash
+sudo docker compose pull
+sudo docker compose up -d
+```
+
+## 两种更新方式区别
+
+### 方式 1：源码构建型
+
+compose：
+
+```yaml
+build:
+  context: .
+  dockerfile: backend/Dockerfile
+```
+
+更新方式：
 
 ```bash
 sudo docker compose up -d --build
 ```
 
-如果要自定义宿主机数据目录：
+优点：
+
+- 简单
+- 不需要镜像仓库
+- 非常适合你现在这种个人项目
+
+缺点：
+
+- 服务器本机要参与构建
+
+### 方式 2：远程镜像型
+
+compose：
+
+```yaml
+image: yourname/img-converter:latest
+```
+
+更新方式：
 
 ```bash
-HOST_DATA_DIR=/your/data/root sudo -E docker compose up -d --build
+sudo docker compose pull
+sudo docker compose up -d
 ```
 
-### 5. 打开前端页面
+优点：
 
-```text
-http://你的服务器IP:8080
+- 服务器更新更标准
+- 多台机器部署方便
+
+缺点：
+
+- 你需要维护镜像仓库
+- 每次改代码都要 build + push 镜像
+
+## 建议
+
+对你现在这个项目，我建议：
+
+- 目前先继续用 `build` 模式
+- 因为你还在开发和频繁修改功能
+- 等功能稳定后，我再帮你加 GitHub Actions 自动构建镜像并推送 `latest`
+
+那时你就可以真的使用：
+
+```yaml
+image: ghcr.io/lc010224/img-converter:latest
 ```
 
-后端接口默认地址：
+## 部署方式
 
-```text
-http://你的服务器IP:8000
-```
-
-## 使用说明
-
-1. 打开前端页面
-2. 在“源图片目录”区域中浏览 `/data` 下的目录结构
-3. 进入任意子目录后，点击“选中”作为待转换目录
-4. 在“输出目录”区域中浏览 `/data` 下的目录结构
-5. 进入任意子目录后，点击“选中”作为输出目录
-6. 设置目标格式、质量、输入格式、是否删除原图
-7. 点击“开始转换”
-
-## 目录选择规则
-
-- 前端只能浏览 `/data` 下的目录
-- 后端也只接受 `/data` 下的路径
-- 这样可以避免用户误操作到服务器其他系统目录
-- 你可以在宿主机数据目录下提前创建任意业务目录结构，前端会直接显示这些子目录
-
-## 示例目录映射关系
-
-如果宿主机目录是：
-
-```text
-/opt/image-converter-data/raw/2025/album-a
-```
-
-那么前端里看到并选择的路径会是：
-
-```text
-/data/raw/2025/album-a
-```
-
-如果宿主机输出目录是：
-
-```text
-/opt/image-converter-data/converted/webp
-```
-
-那么前端里选择的输出路径会是：
-
-```text
-/data/converted/webp
-```
-
-## 运行检查
+### 1. 准备数据目录
 
 ```bash
-sudo docker compose ps
-sudo docker compose logs -f backend
-sudo docker compose logs -f frontend
-curl http://127.0.0.1:8000/health
+sudo mkdir -p /home/img-converter/data
 ```
 
-还可以测试目录浏览接口：
+### 2. 上传项目
 
 ```bash
-curl "http://127.0.0.1:8000/folders?path=/data"
+scp -r 图片格式转换 user@your-server-ip:/opt/image-converter
 ```
 
-## 注意事项
+### 3. 启动
 
-- 如果某个子目录没有出现在前端，先确认它确实存在于宿主机数据目录下。
-- 输出目录如果不存在，后端在转换时会自动创建。
-- 转成 `webp` 时使用 `cwebp`。
-- 转成 `jpeg` / `png` 时使用 Pillow。
-- 当前项目仓库：
+```bash
+cd /opt/image-converter
+sudo docker compose up -d --build
+```
+
+### 4. 访问
+
+```text
+http://你的服务器IP:3115
+```
+
+## 当前仓库
 
 ```text
 https://github.com/lc010224/img-converter.git

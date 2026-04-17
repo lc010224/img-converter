@@ -1,4 +1,4 @@
-const apiBase = `${window.location.protocol}//${window.location.hostname}:8000`;
+const apiBase = window.location.origin;
 const form = document.getElementById('conversion-form');
 const resultBox = document.getElementById('resultBox');
 const statusBanner = document.getElementById('statusBanner');
@@ -27,10 +27,10 @@ async function checkHealth() {
       throw new Error('health check failed');
     }
     const data = await response.json();
-    statusBanner.textContent = `后端在线 · 数据根目录: ${data.data_root} · cwebp: ${data.cwebp} · inotifywait: ${data.inotifywait}`;
+    statusBanner.textContent = `服务在线 · 数据根目录: ${data.data_root} · cwebp: ${data.cwebp} · inotifywait: ${data.inotifywait}`;
     statusBanner.className = 'status-banner ok';
   } catch (error) {
-    statusBanner.textContent = '后端不可达，请检查 backend 容器是否正常运行';
+    statusBanner.textContent = '服务不可达，请检查容器是否正常运行';
     statusBanner.className = 'status-banner error';
   }
 }
@@ -46,7 +46,6 @@ function renderFolderButtons(type, payload) {
   state.selectedEl.textContent = state.selectedPath;
 
   const segments = [];
-
   segments.push(`
     <button type="button" class="folder-item folder-item--select ${state.selectedPath === payload.current_path ? 'is-active' : ''}" data-picker-type="${type}" data-path="${payload.current_path}" data-mode="select">
       选择当前目录

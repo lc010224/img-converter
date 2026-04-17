@@ -1,20 +1,13 @@
 services:
-  backend:
+  img-converter:
     build:
-      context: ./backend
-    container_name: image-converter-backend
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: img-converter
     restart: unless-stopped
+    ports:
+      - "3115:7745"
+    environment:
+      - TZ=Asia/Shanghai
     volumes:
-      - ${HOST_DATA_DIR:-/opt/image-converter-data}:/data
-    ports:
-      - "8000:8000"
-
-  frontend:
-    build:
-      context: ./frontend
-    container_name: image-converter-frontend
-    restart: unless-stopped
-    depends_on:
-      - backend
-    ports:
-      - "8080:80"
+      - /home/img-converter/data:/data
