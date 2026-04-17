@@ -76,7 +76,7 @@ input:focus, select:focus { border-color: #a8bbe0; box-shadow: 0 0 0 4px rgba(95
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 22px 24px 12px; }
 .modal-head h3 { margin: 0; font-size: 18px; }
 .modal-close { width: 40px; height: 40px; border: none; border-radius: 10px; background: transparent; color: #74859c; font-size: 28px; line-height: 1; }
-.modal-tree { min-height: 380px; max-height: 56vh; overflow: auto; padding: 0 24px 4px; display: grid; gap: 0; }
+.modal-tree { min-height: 380px; max-height: 56vh; overflow: auto; padding: 0 24px 4px; display: grid; gap: 0; align-content: start; }
 .modal-tree-row { display: grid; grid-template-columns: 24px minmax(0,1fr); gap: 0; align-items: center; padding: 0 0 0 calc(var(--depth) * 18px); }
 .modal-folder-btn, .modal-path-btn, .footer-btn { color: var(--text); }
 .modal-folder-btn { width: 20px; height: 20px; border: none; background: transparent; padding: 0; font-size: 12px; border-radius: 3px; }
