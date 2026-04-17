@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>图片格式转换控制台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="hero-panel">
+        <div class="hero-panel__inner">
+          <p class="eyebrow">OVH · Debian 12 · Docker Compose</p>
+          <h1>图片格式转换控制台</h1>
+          <p class="hero-copy">
+            直接挂载服务器本地目录，批量把图片转换成更轻、更适合分发的格式。
+            后端内置 <code>cwebp</code> 与 <code>inotify-tools</code>，前端可视化配置转换规则。
+          </p>
+          <ul class="feature-list">
+            <li>支持 jpg / jpeg / png / webp 输入</li>
+            <li>目标格式支持 webp / png / jpeg</li>
+            <li>可选删除原图</li>
+            <li>可查看执行日志与处理结果</li>
+          </ul>
+        </div>
+      </aside>
+
+      <main class="workspace-panel">
+        <section class="card form-card">
+          <div class="section-heading">
+            <span class="section-kicker">任务配置</span>
+            <h2>创建一次图片转换任务</h2>
+          </div>
+
+          <form id="conversion-form" class="config-form">
+            <label>
+              <span>源图片目录</span>
+              <input id="sourcePath" name="sourcePath" placeholder="例如：/host/var/www/images/source" required />
+            </label>
+
+            <label>
+              <span>输出目录</span>
+              <input id="outputPath" name="outputPath" placeholder="例如：/host/var/www/images/output" required />
+            </label>
+
+            <div class="grid-two">
+              <label>
+                <span>目标格式</span>
+                <select id="targetFormat" name="targetFormat">
+                  <option value="webp">webp</option>
+                  <option value="jpeg">jpeg</option>
+                  <option value="png">png</option>
+                </select>
+              </label>
+
+              <label>
+                <span>转换质量</span>
+                <input id="quality" name="quality" type="number" min="1" max="100" value="80" required />
+              </label>
+            </div>
+
+            <label>
+              <span>需要处理的原始格式</span>
+              <div class="checkbox-group">
+                <label><input type="checkbox" name="inputFormats" value="jpg" checked /> jpg</label>
+                <label><input type="checkbox" name="inputFormats" value="jpeg" checked /> jpeg</label>
+                <label><input type="checkbox" name="inputFormats" value="png" checked /> png</label>
+                <label><input type="checkbox" name="inputFormats" value="webp" /> webp</label>
+              </div>
+            </label>
+
+            <label class="toggle-row">
+              <input id="deleteOriginal" name="deleteOriginal" type="checkbox" />
+              <span>转换成功后删除原图</span>
+            </label>
+
+            <button type="submit" class="primary-btn">开始转换</button>
+          </form>
+        </section>
+
+        <section class="card status-card">
+          <div class="section-heading">
+            <span class="section-kicker">服务状态</span>
+            <h2>后端连通性与最近结果</h2>
+          </div>
+          <div id="statusBanner" class="status-banner pending">正在检测后端状态...</div>
+          <pre id="resultBox" class="result-box">等待执行任务...</pre>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
