@@ -62,7 +62,7 @@ input:focus, select:focus { border-color: #a8bbe0; box-shadow: 0 0 0 4px rgba(95
 .compact-upload-zone { min-height: 208px; }
 .upload-zone { border: 2px dashed #d7dff0; border-radius: 26px; background: linear-gradient(180deg, #fff, #fbfcff); display: grid; place-items: center; gap: 10px; padding: 26px; text-align: center; color: var(--text); }
 .upload-zone.is-dragging, .upload-zone:hover { border-color: #c8b9ff; background: linear-gradient(180deg, #fff, #f8f3ff); }
-.upload-zone__icon { width: 68px; height: 68px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle, #ff8af2 0%, #f06bff 100%); color: #1d1535; font-size: 34px; box-shadow: 0 10px 24px rgba(240, 107, 255, 0.22); }
+.upload-zone__icon { width: 68px; height: 68px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle, #ff8af2 0%, #f06bff 100%); color: #1d1535; font-size: 34px; box-shadow: 0 10px 24px rgba(240,107,255,.22); }
 .upload-zone__title { font-size: 18px; font-weight: 700; }
 .upload-zone__hint { color: var(--muted); font-size: 13px; max-width: 580px; }
 .upload-actions { display: flex; gap: 10px; }
@@ -76,15 +76,15 @@ input:focus, select:focus { border-color: #a8bbe0; box-shadow: 0 0 0 4px rgba(95
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 22px 24px 12px; }
 .modal-head h3 { margin: 0; font-size: 18px; }
 .modal-close { width: 40px; height: 40px; border: none; border-radius: 10px; background: transparent; color: #74859c; font-size: 28px; line-height: 1; }
-.modal-tree { min-height: 380px; max-height: 56vh; overflow: auto; padding: 2px 24px 8px; display: grid; gap: 1px; }
-.modal-tree-row { display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 4px; align-items: center; padding: 1px 0 1px calc(var(--depth) * 18px); }
+.modal-tree { min-height: 380px; max-height: 56vh; overflow: auto; padding: 0 24px 4px; display: grid; gap: 0; }
+.modal-tree-row { display: grid; grid-template-columns: 24px minmax(0,1fr); gap: 0; align-items: center; padding: 0 0 0 calc(var(--depth) * 18px); }
 .modal-folder-btn, .modal-path-btn, .footer-btn { color: var(--text); }
-.modal-folder-btn { width: 28px; height: 28px; border: none; background: transparent; padding: 0; font-size: 16px; border-radius: 6px; }
+.modal-folder-btn { width: 20px; height: 20px; border: none; background: transparent; padding: 0; font-size: 12px; border-radius: 3px; }
 .modal-folder-btn:hover, .modal-folder-btn.is-open { background: #f2f5fb; }
-.modal-path-btn { width: 100%; min-height: 28px; border: none; background: transparent; text-align: left; padding: 0 6px; border-radius: 6px; }
+.modal-path-btn { width: 100%; min-height: 20px; border: none; background: transparent; text-align: left; padding: 0 3px; border-radius: 3px; }
 .modal-path-btn:hover { background: #f6f8fc; }
 .modal-tree-row--selected .modal-path-btn, .modal-path-btn.is-selected { background: #eef2ff; color: #3151d3; }
-.modal-path-name { font-size: 13px; }
+.modal-path-name { font-size: 12px; }
 .modal-empty { min-height: 180px; display: flex; align-items: center; justify-content: center; color: var(--muted); }
 .modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px 20px; border-top: 1px solid #edf2f7; }
 .modal-current { color: #526276; font-size: 14px; }
@@ -92,4 +92,4 @@ input:focus, select:focus { border-color: #a8bbe0; box-shadow: 0 0 0 4px rgba(95
 .footer-btn { min-height: 42px; padding: 0 18px; border-radius: 12px; border: 1px solid #d7e0eb; background: #fff; }
 .footer-btn--primary { background: #5f7cff; border-color: #5f7cff; color: #fff; }
 @media (max-width: 1180px) { .content-grid, .two-column-fields, .page-shell, .local-file-grid { grid-template-columns: 1fr; } }
-@media (max-width: 820px) { .page-shell { padding: 16px; } .topbar, .card-head, .modal-footer { display: grid; grid-template-columns: 1fr; } .path-input-wrap { grid-template-columns: 1fr 56px; } .modal-tree-row { grid-template-columns: 28px minmax(0,1fr); padding-left: 0; } .upload-actions { flex-direction: column; } }
+@media (max-width: 820px) { .page-shell { padding: 16px; } .topbar, .card-head, .modal-footer { display: grid; grid-template-columns: 1fr; } .path-input-wrap { grid-template-columns: 1fr 56px; } .modal-tree-row { grid-template-columns: 20px minmax(0,1fr); padding-left: 0; } .upload-actions { flex-direction: column; } }
