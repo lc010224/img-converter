@@ -1,9 +1,9 @@
 from io import BytesIO
 from pathlib import Path
+import json
 import shutil
 import subprocess
 import threading
-import time
 from typing import Literal
 
 import cairosvg
@@ -20,6 +20,7 @@ register_heif_opener()
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 DATA_ROOT = Path("/data")
+SETTINGS_FILE = BASE_DIR / "settings.json"
 SUPPORTED_INPUTS = {
     "jpg", "jpeg", "jpe", "jfif", "png", "webp", "gif", "bmp", "dib", "ico",
     "tif", "tiff", "pbm", "pgm", "pnm", "ppm", "heic", "heif", "avif", "svg",
@@ -28,6 +29,14 @@ SUPPORTED_OUTPUTS = {"same", "webp", "jpeg", "png", "gif", "bmp", "tiff"}
 HEIF_FAMILY = {"heic", "heif", "avif"}
 JPEG_FAMILY = {"jpg", "jpeg", "jpe", "jfif"}
 TIFF_FAMILY = {"tif", "tiff"}
+DEFAULT_SETTINGS = {
+    "background_url": "https://images.example.com/cover.jpg",
+    "theme_style": "清透浅色",
+    "result_display": "JSON 原样显示",
+    "naming_strategy": "保留原名",
+    "carousel_interval": 8,
+    "background_blur": 12,
+}
 
 app = FastAPI(title="Image Converter API")
 app.add_middleware(
@@ -54,6 +63,15 @@ class WatchRequest(ConvertRequest):
     enabled: bool = True
 
 
+class SettingsRequest(BaseModel):
+    background_url: str = Field(min_length=1)
+    theme_style: str = Field(min_length=1)
+    result_display: str = Field(min_length=1)
+    naming_strategy: str = Field(min_length=1)
+    carousel_interval: int = Field(ge=1, le=3600)
+    background_blur: int = Field(ge=0, le=50)
+
+
 watch_state = {
     "thread": None,
     "stop_event": None,
@@ -64,6 +82,24 @@ watch_state = {
 
 def ensure_data_root() -> None:
     DATA_ROOT.mkdir(parents=True, exist_ok=True)
+
+
+def load_settings() -> dict:
+    if not SETTINGS_FILE.exists():
+        save_settings(DEFAULT_SETTINGS)
+        return DEFAULT_SETTINGS.copy()
+    try:
+        data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        save_settings(DEFAULT_SETTINGS)
+        return DEFAULT_SETTINGS.copy()
+    merged = DEFAULT_SETTINGS.copy()
+    merged.update({key: data.get(key, DEFAULT_SETTINGS[key]) for key in DEFAULT_SETTINGS})
+    return merged
+
+
+def save_settings(settings: dict) -> None:
+    SETTINGS_FILE.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def resolve_data_path(raw_path: str) -> Path:
@@ -153,13 +189,13 @@ def convert_matching_images(request: ConvertRequest, only_new: bool = False) -> 
     for file_path in source_dir.rglob('*'):
         if not file_path.is_file():
             continue
-
         source_ext = file_path.suffix.lower().lstrip('.')
         if source_ext not in normalized_formats:
             continue
 
+        stat = file_path.stat()
         display_source = to_display_path(file_path)
-        file_marker = f"{display_source}:{int(file_path.stat().st_mtime)}:{file_path.stat().st_size}"
+        file_marker = f"{display_source}:{int(stat.st_mtime)}:{stat.st_size}"
         if only_new and file_marker in watch_state["seen"]:
             continue
 
@@ -170,13 +206,10 @@ def convert_matching_images(request: ConvertRequest, only_new: bool = False) -> 
 
         try:
             if final_format == 'webp' and source_ext not in {"svg", *HEIF_FAMILY}:
-                subprocess.run([
-                    'cwebp', '-q', str(request.quality), str(file_path), '-o', str(target_path),
-                ], check=True, capture_output=True, text=True)
+                subprocess.run(['cwebp', '-q', str(request.quality), str(file_path), '-o', str(target_path)], check=True, capture_output=True, text=True)
             else:
                 with open_image(file_path) as image:
                     save_with_pillow(image, target_path, final_format, request.quality)
-
             converted.append({'source': display_source, 'output': to_display_path(target_path), 'target_format': final_format})
             watch_state["seen"].add(file_marker)
             if request.delete_original and target_path != file_path:
@@ -247,13 +280,23 @@ def list_folders(path: str = Query(default="/data")):
     current_path = resolve_data_path(path)
     if not current_path.exists() or not current_path.is_dir():
         raise HTTPException(status_code=404, detail="目录不存在")
-
     directories = sorted(item for item in current_path.iterdir() if item.is_dir())
     parent = None
     if current_path.resolve() != DATA_ROOT.resolve():
         parent = to_display_path(current_path.parent)
-
     return {"current_path": to_display_path(current_path), "parent_path": parent, "directories": [{"name": item.name, "path": to_display_path(item)} for item in directories]}
+
+
+@app.get("/settings")
+def get_settings():
+    return load_settings()
+
+
+@app.post("/settings")
+def update_settings(request: SettingsRequest):
+    settings = request.model_dump()
+    save_settings(settings)
+    return settings
 
 
 @app.post("/convert")
@@ -268,14 +311,12 @@ def configure_watch(request: WatchRequest):
     stop_watch_worker()
     watch_state["config"] = request
     watch_state["seen"] = set()
-
     if request.enabled:
         stop_event = threading.Event()
         thread = threading.Thread(target=watch_worker, args=(stop_event,), daemon=True)
         watch_state["stop_event"] = stop_event
         watch_state["thread"] = thread
         thread.start()
-
     return {
         "enabled": request.enabled,
         "watch_running": bool(watch_state["thread"] and watch_state["thread"].is_alive()),
