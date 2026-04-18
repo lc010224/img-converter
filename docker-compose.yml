@@ -9,3 +9,4 @@ services:
       - TZ=Asia/Shanghai
     volumes:
       - /home/img-converter/data:/data
+      - /home/img-converter/local-temp:/local-temp
