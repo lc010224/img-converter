@@ -2,6 +2,8 @@ from io import BytesIO
 from pathlib import Path
 import shutil
 import subprocess
+import threading
+import time
 from typing import Literal
 
 import cairosvg
@@ -45,6 +47,19 @@ class ConvertRequest(BaseModel):
     quality: int = Field(ge=1, le=100)
     input_formats: list[str] = Field(min_length=1)
     delete_original: bool = False
+
+
+class WatchRequest(ConvertRequest):
+    interval_seconds: int = Field(ge=3, le=86400)
+    enabled: bool = True
+
+
+watch_state = {
+    "thread": None,
+    "stop_event": None,
+    "config": None,
+    "seen": set(),
+}
 
 
 def ensure_data_root() -> None:
@@ -120,42 +135,7 @@ def save_with_pillow(image: Image.Image, target_path: Path, target_format: str, 
     raise ValueError(f"不支持的目标格式: {target_format}")
 
 
-@app.get("/")
-def index():
-    return FileResponse(STATIC_DIR / "index.html")
-
-
-@app.get("/health")
-def health():
-    ensure_data_root()
-    return {
-        "status": "ok",
-        "data_root": str(DATA_ROOT),
-        "cwebp": shutil.which("cwebp") is not None,
-        "inotifywait": shutil.which("inotifywait") is not None,
-    }
-
-
-@app.get("/folders")
-def list_folders(path: str = Query(default="/data")):
-    current_path = resolve_data_path(path)
-    if not current_path.exists() or not current_path.is_dir():
-        raise HTTPException(status_code=404, detail="目录不存在")
-
-    directories = sorted(item for item in current_path.iterdir() if item.is_dir())
-    parent = None
-    if current_path.resolve() != DATA_ROOT.resolve():
-        parent = to_display_path(current_path.parent)
-
-    return {
-        "current_path": to_display_path(current_path),
-        "parent_path": parent,
-        "directories": [{"name": item.name, "path": to_display_path(item)} for item in directories],
-    }
-
-
-@app.post("/convert")
-def convert_images(request: ConvertRequest):
+def convert_matching_images(request: ConvertRequest, only_new: bool = False) -> dict:
     source_dir = resolve_data_path(request.source_path)
     output_dir = resolve_data_path(request.output_path)
 
@@ -168,7 +148,6 @@ def convert_images(request: ConvertRequest):
         raise HTTPException(status_code=400, detail=f"不支持的输入格式: {', '.join(invalid_formats)}")
 
     output_dir.mkdir(parents=True, exist_ok=True)
-
     converted, skipped, errors = [], [], []
 
     for file_path in source_dir.rglob('*'):
@@ -177,6 +156,11 @@ def convert_images(request: ConvertRequest):
 
         source_ext = file_path.suffix.lower().lstrip('.')
         if source_ext not in normalized_formats:
+            continue
+
+        display_source = to_display_path(file_path)
+        file_marker = f"{display_source}:{int(file_path.stat().st_mtime)}:{file_path.stat().st_size}"
+        if only_new and file_marker in watch_state["seen"]:
             continue
 
         final_format = normalize_target_format(source_ext, request.target_format)
@@ -193,16 +177,12 @@ def convert_images(request: ConvertRequest):
                 with open_image(file_path) as image:
                     save_with_pillow(image, target_path, final_format, request.quality)
 
-            converted.append({
-                'source': to_display_path(file_path),
-                'output': to_display_path(target_path),
-                'target_format': final_format,
-            })
-
+            converted.append({'source': display_source, 'output': to_display_path(target_path), 'target_format': final_format})
+            watch_state["seen"].add(file_marker)
             if request.delete_original and target_path != file_path:
                 file_path.unlink()
         except Exception as exc:
-            errors.append({'source': to_display_path(file_path), 'error': str(exc)})
+            errors.append({'source': display_source, 'error': str(exc)})
 
     if not converted and not errors:
         skipped.append('没有匹配到可转换的图片文件')
@@ -219,4 +199,90 @@ def convert_images(request: ConvertRequest):
         'converted': converted,
         'skipped': skipped,
         'errors': errors,
+    }
+
+
+def stop_watch_worker() -> None:
+    stop_event = watch_state["stop_event"]
+    thread = watch_state["thread"]
+    if stop_event is not None:
+        stop_event.set()
+    if thread is not None and thread.is_alive():
+        thread.join(timeout=1.5)
+    watch_state["thread"] = None
+    watch_state["stop_event"] = None
+
+
+def watch_worker(stop_event: threading.Event) -> None:
+    while not stop_event.is_set():
+        config = watch_state["config"]
+        if not config:
+            break
+        try:
+            convert_matching_images(config, only_new=True)
+        except Exception:
+            pass
+        stop_event.wait(config.interval_seconds)
+
+
+@app.get("/")
+def index():
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/health")
+def health():
+    ensure_data_root()
+    return {
+        "status": "ok",
+        "data_root": str(DATA_ROOT),
+        "cwebp": shutil.which("cwebp") is not None,
+        "inotifywait": shutil.which("inotifywait") is not None,
+        "watch_running": bool(watch_state["thread"] and watch_state["thread"].is_alive()),
+    }
+
+
+@app.get("/folders")
+def list_folders(path: str = Query(default="/data")):
+    current_path = resolve_data_path(path)
+    if not current_path.exists() or not current_path.is_dir():
+        raise HTTPException(status_code=404, detail="目录不存在")
+
+    directories = sorted(item for item in current_path.iterdir() if item.is_dir())
+    parent = None
+    if current_path.resolve() != DATA_ROOT.resolve():
+        parent = to_display_path(current_path.parent)
+
+    return {"current_path": to_display_path(current_path), "parent_path": parent, "directories": [{"name": item.name, "path": to_display_path(item)} for item in directories]}
+
+
+@app.post("/convert")
+def convert_images(request: ConvertRequest):
+    return convert_matching_images(request, only_new=False)
+
+
+@app.post("/watch")
+def configure_watch(request: WatchRequest):
+    resolve_data_path(request.source_path)
+    resolve_data_path(request.output_path)
+    stop_watch_worker()
+    watch_state["config"] = request
+    watch_state["seen"] = set()
+
+    if request.enabled:
+        stop_event = threading.Event()
+        thread = threading.Thread(target=watch_worker, args=(stop_event,), daemon=True)
+        watch_state["stop_event"] = stop_event
+        watch_state["thread"] = thread
+        thread.start()
+
+    return {
+        "enabled": request.enabled,
+        "watch_running": bool(watch_state["thread"] and watch_state["thread"].is_alive()),
+        "source_path": request.source_path,
+        "output_path": request.output_path,
+        "interval_seconds": request.interval_seconds,
+        "target_format": request.target_format,
+        "input_formats": request.input_formats,
+        "delete_original": request.delete_original,
     }

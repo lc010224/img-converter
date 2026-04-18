@@ -16,6 +16,8 @@ const pickFilesBtn = document.getElementById('pickFilesBtn');
 const pickFolderBtn = document.getElementById('pickFolderBtn');
 const localSelectionResult = document.getElementById('localSelectionResult');
 const localConvertBtn = document.getElementById('localConvertBtn');
+const saveWatchBtn = document.getElementById('saveWatchBtn');
+const saveToast = document.getElementById('saveToast');
 
 const pathTargets = {
   source: document.getElementById('sourcePathDisplay'),
@@ -30,6 +32,7 @@ const appState = {
   expanded: new Set(['/data']),
   treeData: {},
   localFiles: [],
+  saveToastTimer: null,
 };
 
 function setActiveTab(tab) {
@@ -38,12 +41,24 @@ function setActiveTab(tab) {
   pageTitle.textContent = { convert: '图片转换', watch: '自动监听', studio: '视觉与策略' }[tab] || '图片转换';
 }
 
+function showSaveToast(text = '保存成功') {
+  if (!saveToast) return;
+  saveToast.textContent = text;
+  saveToast.classList.add('is-visible');
+  saveToast.setAttribute('aria-hidden', 'false');
+  if (appState.saveToastTimer) clearTimeout(appState.saveToastTimer);
+  appState.saveToastTimer = window.setTimeout(() => {
+    saveToast.classList.remove('is-visible');
+    saveToast.setAttribute('aria-hidden', 'true');
+  }, 2000);
+}
+
 async function checkHealth() {
   try {
     const response = await fetch(`${apiBase}/health`);
     if (!response.ok) throw new Error();
     const data = await response.json();
-    statusBanner.textContent = `服务在线 · 数据根目录 ${data.data_root} · cwebp ${data.cwebp ? '已安装' : '缺失'} · inotifywait ${data.inotifywait ? '已安装' : '缺失'}`;
+    statusBanner.textContent = `服务在线 · 数据根目录 ${data.data_root} · cwebp ${data.cwebp ? '已安装' : '缺失'} · inotifywait ${data.inotifywait ? '已安装' : '缺失'} · 自动监听 ${data.watch_running ? '运行中' : '未启动'}`;
     statusBanner.className = 'status-banner ok';
   } catch {
     statusBanner.textContent = '服务不可达，请检查容器是否正常运行';
@@ -158,6 +173,41 @@ function renderLocalSelection(files) {
   localSelectionResult.textContent = `共选择 ${files.length} 个项目\n\n${lines.join('\n')}${extra}`;
 }
 
+async function saveWatchConfig() {
+  const inputFormats = collectFormats('watchInputFormats');
+  if (!inputFormats.length) {
+    resultBox.textContent = '自动监听至少要选择一种源文件格式。';
+    setActiveTab('watch');
+    return;
+  }
+  const payload = {
+    source_path: pathTargets.watchSource.value.trim(),
+    output_path: pathTargets.watchOutput.value.trim(),
+    target_format: document.getElementById('watchTargetFormat').value,
+    quality: 82,
+    interval_seconds: Number(document.getElementById('watchInterval').value || 15),
+    input_formats: inputFormats,
+    delete_original: document.getElementById('watchDeleteOriginal').checked,
+    enabled: document.getElementById('watchEnabled').checked,
+  };
+
+  try {
+    const response = await fetch(`${apiBase}/watch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || '保存失败');
+    showSaveToast('保存成功');
+    resultBox.textContent = JSON.stringify(data, null, 2);
+    checkHealth();
+  } catch (error) {
+    resultBox.textContent = `保存监听配置失败：${error.message}`;
+    setActiveTab('watch');
+  }
+}
+
 navItems.forEach((item) => item.addEventListener('click', () => setActiveTab(item.dataset.tab)));
 localUploadTrigger.addEventListener('click', () => localFileInput.click());
 pickFilesBtn.addEventListener('click', () => localFileInput.click());
@@ -171,7 +221,6 @@ localUploadTrigger.addEventListener('drop', (event) => {
   localUploadTrigger.classList.remove('is-dragging');
   renderLocalSelection(Array.from(event.dataTransfer?.files || []));
 });
-
 localConvertBtn?.addEventListener('click', () => {
   const localFormats = collectFormats('localInputFormats');
   if (!appState.localFiles.length) {
@@ -188,6 +237,7 @@ localConvertBtn?.addEventListener('click', () => {
     selected_items: appState.localFiles.slice(0, 20).map((file) => file.webkitRelativePath || file.name),
   }, null, 2);
 });
+saveWatchBtn?.addEventListener('click', saveWatchConfig);
 
 document.addEventListener('click', async (event) => {
   const target = event.target;
